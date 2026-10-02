@@ -1837,6 +1837,11 @@
 
   document.getElementById("fitSelect").addEventListener("change", (e) => {
     state.imageFit = e.target.value;
+    // 既に配置済みの画像にも、この教室のテンプレートに限り新しい収め方をすぐ反映する
+    const tpl = activeTpl();
+    Object.values(tpl.cells || {}).forEach(cell => {
+      if (cell && cell.type === "image") cell.fit = state.imageFit;
+    });
     scheduleSave();
     renderAll();
   });
