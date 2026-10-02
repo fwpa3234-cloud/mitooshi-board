@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="assets/exceljs.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style id="pageSizeStyle">
   @page { size: A4 landscape; margin: 12mm; }
 </style>
@@ -299,6 +300,38 @@
     background: var(--surface); color: var(--text); padding: 18px 26px; border-radius: 10px;
     box-shadow: var(--shadow); font-size: 14px;
   }
+
+  .drive-modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(33,30,25,0.45); z-index: 300;
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .drive-modal-overlay.show { display: flex; }
+  .drive-modal {
+    background: var(--surface); color: var(--text); border-radius: 12px; box-shadow: var(--shadow);
+    width: min(720px, 100%); max-height: 86vh; display: flex; flex-direction: column; overflow: hidden;
+  }
+  .drive-modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid var(--line);
+  }
+  .drive-modal-header h3 { margin: 0; font-size: 16px; }
+  .drive-modal-body { padding: 16px 18px; overflow-y: auto; flex: 1; min-height: 160px; }
+  .drive-modal-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 18px; border-top: 1px solid var(--line); gap: 10px;
+  }
+  .drive-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+  .drive-thumb {
+    border: 2px solid transparent; border-radius: 8px; overflow: hidden; cursor: pointer;
+    background: var(--surface-2); position: relative;
+  }
+  .drive-thumb.selected { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+  .drive-thumb.selected::after {
+    content: "✓"; position: absolute; top: 4px; right: 4px; z-index: 2; width: 18px; height: 18px;
+    background: var(--accent); color: #fff; font-size: 12px; line-height: 18px; text-align: center; border-radius: 50%;
+  }
+  .drive-thumb img { width: 100%; aspect-ratio: 1/1; object-fit: cover; display: block; background: var(--surface-2); }
+  .drive-thumb .cap { font-size: 11px; padding: 4px 6px; color: var(--text-muted); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
 </head>
 <body>
@@ -342,6 +375,7 @@
       ＋ 画像を追加
       <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple style="display:none">
     </label>
+    <button type="button" class="upload-btn" id="btnDriveImport" style="margin-top:-8px;">☁ Googleドライブから読み込む</button>
     <div class="sidebar-actions">
       <button class="small ghost" id="btnSelectMode">選択して削除・分類</button>
     </div>
@@ -428,6 +462,22 @@
 <div class="toast-stack" id="toastStack"></div>
 <div id="loadingOverlay"><div class="box" id="loadingOverlayText">読み込み中…</div></div>
 
+<div class="drive-modal-overlay" id="driveModalOverlay">
+  <div class="drive-modal">
+    <div class="drive-modal-header">
+      <h3>Googleドライブの画像を選ぶ</h3>
+      <button class="ghost small" id="btnDriveModalClose">閉じる</button>
+    </div>
+    <div class="drive-modal-body" id="driveModalBody">
+      <div class="empty-hint">読み込み中…</div>
+    </div>
+    <div class="drive-modal-footer">
+      <span class="tpl-meta" id="driveSelCount">0件選択中</span>
+      <button class="primary" id="btnDriveImportConfirm">選択した画像を追加</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   "use strict";
@@ -443,6 +493,11 @@
   const MAX_IMAGE_DIMENSION = 1600;   // 保存前に縮小する最大の縦横px
   const IMAGE_JPEG_QUALITY = 0.85;
   const MM_PX = 96 / 25.4;
+
+  // Googleドライブ連携（共有フォルダから画像を読み込む機能）
+  const GOOGLE_CLIENT_ID = "993734822210-nntl2o96mnfop7psqn2ltd2u9mfgk349.apps.googleusercontent.com";
+  const DRIVE_FOLDER_ID = "1GtbrBcBop4wFm347nqrHoKaHDNwL5pPL";
+  const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
 
   // ============================================================
   // トースト通知（画面右下にエラー・お知らせを表示）
@@ -976,6 +1031,160 @@
     renderSidebar();
     updateStorageMeter();
   }
+
+  // ============================================================
+  // Googleドライブ連携（共有フォルダの画像を一覧表示して取り込む）
+  // ============================================================
+  let driveTokenClient = null;
+  let driveAccessToken = null;
+  let driveAccessTokenExpiry = 0;
+  let driveSelectedIds = new Set();
+  let driveFilesCache = [];
+
+  function ensureDriveToken(forceConsent){
+    return new Promise((resolve, reject) => {
+      if (!forceConsent && driveAccessToken && Date.now() < driveAccessTokenExpiry - 60000){
+        resolve(driveAccessToken);
+        return;
+      }
+      if (!window.google || !google.accounts || !google.accounts.oauth2){
+        reject(new Error("Google認証ライブラリを読み込めませんでした。通信環境をご確認のうえ、ページを再読み込みしてください。"));
+        return;
+      }
+      if (!driveTokenClient){
+        driveTokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope: DRIVE_SCOPE,
+          callback: () => {}
+        });
+      }
+      driveTokenClient.callback = (resp) => {
+        if (!resp || resp.error){
+          reject(new Error("Googleアカウントでの認証に失敗しました。" + (resp && resp.error ? "（" + resp.error + "）" : "")));
+          return;
+        }
+        driveAccessToken = resp.access_token;
+        driveAccessTokenExpiry = Date.now() + (resp.expires_in ? resp.expires_in * 1000 : 3500 * 1000);
+        resolve(driveAccessToken);
+      };
+      driveTokenClient.requestAccessToken({ prompt: driveAccessToken ? "" : "consent" });
+    });
+  }
+
+  async function fetchDriveImageList(token){
+    const q = `'${DRIVE_FOLDER_ID}' in parents and trashed = false and mimeType contains 'image/'`;
+    const params = new URLSearchParams({
+      q, fields: "files(id,name,mimeType,thumbnailLink)",
+      orderBy: "name", pageSize: "200",
+      supportsAllDrives: "true", includeItemsFromAllDrives: "true"
+    });
+    const res = await fetch("https://www.googleapis.com/drive/v3/files?" + params.toString(), {
+      headers: { Authorization: "Bearer " + token }
+    });
+    if (!res.ok){
+      if (res.status === 401) driveAccessToken = null;
+      throw new Error("Googleドライブの画像一覧を取得できませんでした（エラー " + res.status + "）。");
+    }
+    const data = await res.json();
+    return data.files || [];
+  }
+
+  async function downloadDriveFile(fileId, token){
+    const res = await fetch(
+      "https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media&supportsAllDrives=true",
+      { headers: { Authorization: "Bearer " + token } }
+    );
+    if (!res.ok) throw new Error("画像のダウンロードに失敗しました（エラー " + res.status + "）。");
+    return await res.blob();
+  }
+
+  function updateDriveSelCount(){
+    document.getElementById("driveSelCount").textContent = driveSelectedIds.size + "件選択中";
+  }
+
+  function renderDriveGrid(){
+    const body = document.getElementById("driveModalBody");
+    if (!driveFilesCache.length){
+      body.innerHTML = `<div class="empty-hint">共有フォルダ「みとおしボード画像」に画像が見つかりませんでした。<br>Googleドライブにこのフォルダを開き、画像ファイルを入れてから、もう一度お試しください。</div>`;
+      return;
+    }
+    body.innerHTML = "";
+    const grid = document.createElement("div");
+    grid.className = "drive-grid";
+    driveFilesCache.forEach(f => {
+      const div = document.createElement("div");
+      div.className = "drive-thumb" + (driveSelectedIds.has(f.id) ? " selected" : "");
+      const thumb = f.thumbnailLink || "";
+      div.innerHTML = `<img src="${thumb}" alt="" loading="lazy"><div class="cap">${f.name}</div>`;
+      div.addEventListener("click", () => {
+        if (driveSelectedIds.has(f.id)) driveSelectedIds.delete(f.id);
+        else driveSelectedIds.add(f.id);
+        div.classList.toggle("selected");
+        updateDriveSelCount();
+      });
+      grid.appendChild(div);
+    });
+    body.appendChild(grid);
+  }
+
+  function closeDriveModal(){
+    document.getElementById("driveModalOverlay").classList.remove("show");
+  }
+
+  async function openDriveModal(){
+    document.getElementById("driveModalOverlay").classList.add("show");
+    driveSelectedIds.clear();
+    updateDriveSelCount();
+    const body = document.getElementById("driveModalBody");
+    body.innerHTML = `<div class="empty-hint">Googleアカウントを確認しています…（はじめての場合はログインと許可の画面が開きます）</div>`;
+    let token;
+    try {
+      token = await ensureDriveToken();
+    } catch(err){
+      body.innerHTML = `<div class="empty-hint">${err.message}</div>`;
+      return;
+    }
+    body.innerHTML = `<div class="empty-hint">画像一覧を取得しています…</div>`;
+    try {
+      driveFilesCache = await fetchDriveImageList(token);
+    } catch(err){
+      body.innerHTML = `<div class="empty-hint">${err.message}</div>`;
+      return;
+    }
+    renderDriveGrid();
+  }
+
+  document.getElementById("btnDriveImport").addEventListener("click", openDriveModal);
+  document.getElementById("btnDriveModalClose").addEventListener("click", closeDriveModal);
+  document.getElementById("driveModalOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "driveModalOverlay") closeDriveModal();
+  });
+  document.getElementById("btnDriveImportConfirm").addEventListener("click", async () => {
+    if (!driveSelectedIds.size){ showToast("取り込む画像を選択してください。", "error"); return; }
+    const ids = Array.from(driveSelectedIds);
+    const targets = driveFilesCache.filter(f => ids.includes(f.id));
+    closeDriveModal();
+    showLoading(`Googleドライブから画像を取り込んでいます（0/${targets.length}）…`);
+    const files = [];
+    let done = 0;
+    for (const f of targets){
+      try {
+        const blob = await downloadDriveFile(f.id, driveAccessToken);
+        const mime = blob.type || f.mimeType || "image/jpeg";
+        const hasExt = /\.[a-zA-Z0-9]+$/.test(f.name || "");
+        const ext = mime.indexOf("png") >= 0 ? "png" : mime.indexOf("gif") >= 0 ? "gif" : mime.indexOf("webp") >= 0 ? "webp" : "jpg";
+        const fileName = hasExt ? f.name : (f.name || "画像") + "." + ext;
+        files.push(new File([blob], fileName, { type: mime }));
+      } catch(err){
+        console.error(err);
+        showToast(`「${f.name}」を取り込めませんでした：${err.message || "不明なエラー"}`, "error");
+      }
+      done++;
+      showLoading(`Googleドライブから画像を取り込んでいます（${done}/${targets.length}）…`);
+    }
+    hideLoading();
+    if (files.length) await addUploadedFiles(files);
+  });
 
   // ---------- cell content helpers ----------
   function setCellImage(r,c,imageId,fit){ activeTpl().cells[cellKey(r,c)] = { type: "image", imageId, fit: fit || state.imageFit || "cover" }; scheduleSave(); renderAll(); }
