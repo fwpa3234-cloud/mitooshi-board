@@ -1,0 +1,1872 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>みとおしボード</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="assets/exceljs.min.js"></script>
+<style id="pageSizeStyle">
+  @page { size: A4 landscape; margin: 12mm; }
+</style>
+<style>
+  :root {
+    --bg: #F6F2EA;
+    --surface: #FFFFFF;
+    --surface-2: #EFE9DC;
+    --line: #DDD3BF;
+    --text: #2B2620;
+    --text-muted: #756C5C;
+    --primary: #3D6B63;
+    --primary-ink: #FFFFFF;
+    --accent: #E2965C;
+    --danger: #B5533C;
+    --shadow: 0 1px 2px rgba(43,38,32,0.08), 0 4px 14px rgba(43,38,32,0.06);
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #211E19; --surface: #2A261F; --surface-2: #332E25; --line: #4A4336;
+      --text: #EDE7DA; --text-muted: #A79E8C; --primary: #6FA79C; --primary-ink: #1B2624;
+      --accent: #EFA96C; --danger: #D97B65;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 14px rgba(0,0,0,0.25);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #211E19; --surface: #2A261F; --surface-2: #332E25; --line: #4A4336;
+    --text: #EDE7DA; --text-muted: #A79E8C; --primary: #6FA79C; --primary-ink: #1B2624;
+    --accent: #EFA96C; --danger: #D97B65;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 14px rgba(0,0,0,0.25);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    min-height: 100vh;
+  }
+  h1, h2, h3, .brand { font-family: 'Zen Maru Gothic', 'Noto Sans JP', sans-serif; }
+
+  header.topbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 14px 24px; background: var(--surface); border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 20;
+  }
+  .brand { font-weight: 700; font-size: 20px; letter-spacing: .02em; }
+  .brand small { display:block; font-family:'Noto Sans JP',sans-serif; font-weight:400; font-size:12px; color: var(--text-muted); margin-top: 2px; }
+  .topbar-actions { display: flex; gap: 10px; align-items:center; }
+  .previewing header.topbar { display: none; }
+  .preview-floating {
+    display: none; position: fixed; top: 14px; right: 14px; z-index: 30;
+    gap: 8px; background: rgba(255,255,255,0.92); padding: 8px; border-radius: 10px;
+    box-shadow: var(--shadow);
+  }
+  .previewing .preview-floating { display: flex; }
+
+  button, select {
+    font-family: inherit; font-size: 14px; border: 1px solid var(--line);
+    background: var(--surface); color: var(--text); padding: 8px 14px;
+    border-radius: 8px; cursor: pointer; transition: background .15s ease, transform .05s ease;
+  }
+  button:hover { background: var(--surface-2); }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.primary { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
+  button.primary:hover { filter: brightness(1.06); }
+  button.ghost { background: transparent; }
+  button.danger { color: var(--danger); border-color: var(--danger); background: transparent; }
+  button.small { padding: 5px 10px; font-size: 12.5px; }
+
+  main#app { display: flex; min-height: calc(100vh - 61px); }
+  .previewing #editor { display: none; }
+  .previewing #sidebar { display: none; }
+
+  #sidebar {
+    width: 260px; flex: none; background: var(--surface); border-right: 1px solid var(--line);
+    padding: 18px; overflow-y: auto;
+  }
+  #sidebar h2 { font-size: 15px; margin: 0 0 4px; }
+  #sidebar .hint { font-size: 12px; color: var(--text-muted); margin: 0 0 14px; line-height: 1.6; }
+  .upload-btn {
+    display: block; width: 100%; text-align: center; border: 1.5px dashed var(--line);
+    border-radius: 8px; padding: 12px; font-size: 13px; color: var(--text-muted);
+    cursor: pointer; margin-bottom: 16px; background: var(--surface-2);
+  }
+  .upload-btn:hover { border-color: var(--primary); color: var(--primary); }
+  #imageList { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .thumb { border: 2px solid transparent; border-radius: 8px; overflow: hidden; cursor: pointer; background: var(--surface-2); position: relative; }
+  .thumb.selected { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+  .thumb.selected::after {
+    content: "選択中"; position: absolute; top: 4px; left: 4px; z-index: 2;
+    background: var(--accent); color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 999px;
+  }
+  .selected-badge {
+    display: none; position: fixed; left: 14px; bottom: 14px; z-index: 40;
+    align-items: center; gap: 10px; background: rgba(255,255,255,0.96); padding: 8px 10px 8px 8px;
+    border-radius: 12px; box-shadow: var(--shadow); border: 1.5px solid var(--accent);
+  }
+  .selected-badge.show { display: flex; }
+  .selected-badge img { width: 40px; height: 40px; object-fit: cover; border-radius: 6px; background: var(--surface-2); }
+  .selected-badge .sb-text { font-size: 12.5px; line-height: 1.5; }
+  .selected-badge .sb-text b { display:block; font-size: 12px; color: var(--text-muted); font-weight: 500; }
+  .selected-badge button { padding: 5px 10px; font-size: 12px; }
+  .thumb img { width: 100%; aspect-ratio: 1/1; object-fit: cover; display: block; background: var(--surface-2); }
+  .thumb .cap { font-size: 11px; padding: 4px 6px; color: var(--text-muted); text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .thumb .cap-cat { display:block; font-size: 10px; color: var(--primary); }
+  .thumb .del-btn {
+    position: absolute; top: 3px; right: 3px; width: 18px; height: 18px; border-radius: 50%;
+    background: rgba(0,0,0,0.55); color: #fff; border: none; font-size: 11px; line-height: 18px;
+    padding: 0; display: none; cursor: pointer;
+  }
+  .thumb:hover .del-btn { display: block; }
+  .thumb.selecting .del-btn { display: none; }
+  .thumb .sel-check {
+    position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; margin: 0;
+    accent-color: var(--primary); cursor: pointer; display: none;
+  }
+  .thumb.selecting .sel-check { display: block; }
+  .thumb.check-selected { border-color: var(--primary); }
+  .sidebar-actions { display: flex; gap: 6px; margin-bottom: 10px; }
+  .bulk-bar { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+  .bulk-bar-row { display: flex; gap: 6px; align-items: center; justify-content: space-between; }
+  .bulk-bar-row select { flex: 1; min-width: 0; }
+  .bulk-count { font-size: 12px; color: var(--text-muted); }
+  .cat-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .cat-chip {
+    font-size: 11.5px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line);
+    cursor: pointer; background: var(--surface); color: var(--text-muted); white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .cat-chip:hover { border-color: var(--primary); color: var(--text); }
+  .cat-chip.active { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
+  .cat-chip.add { border-style: dashed; }
+  .cat-chip .cat-del { opacity: .55; font-weight: 700; }
+  .cat-chip .cat-del:hover { opacity: 1; }
+  .empty-hint { font-size: 12px; color: var(--text-muted); padding: 10px 4px; line-height: 1.7; }
+
+  #editor { flex: 1; padding: 22px 26px; overflow: auto; }
+  .toolbar {
+    display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 12px 16px; margin-bottom: 14px;
+    box-shadow: var(--shadow);
+  }
+  .toolbar .group { display: flex; align-items: center; gap: 6px; }
+  .toolbar label { font-size: 12.5px; color: var(--text-muted); }
+  .toolbar input[type="range"] { width: 90px; }
+  .toolbar input[type="text"] {
+    font-family: inherit; font-size: 14px; border: 1px solid var(--line);
+    border-radius: 6px; padding: 7px 10px; background: var(--surface); color: var(--text); width: 200px;
+  }
+  .toolbar select { padding: 7px 10px; min-width: 180px; }
+  .tpl-meta { font-size: 12px; color: var(--text-muted); }
+  .size-inputs { align-items: flex-start; }
+  .size-input-list { display: flex; flex-wrap: wrap; gap: 4px; max-width: 320px; }
+  .size-input-list .size-num-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .size-input-list .size-num-label { font-size: 9px; color: var(--text-muted); }
+  .size-input-list input[type="number"] {
+    width: 48px; font-size: 11px; padding: 3px 4px; border-radius: 4px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text);
+  }
+
+  .grid-wrap { overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 20px; box-shadow: var(--shadow); }
+  .grid { display: grid; gap: 4px; width: max-content; }
+  .cell {
+    background: var(--surface-2); border: 1.5px dashed var(--line); border-radius: 6px;
+    position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  .cell.filled { border-style: solid; }
+  .cell.drag-over { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, var(--surface-2)); }
+  .cell.cell-blank { background: transparent; border: 1px dashed color-mix(in srgb, var(--line) 60%, transparent); }
+  .cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cell .text-content {
+    width: 100%; height: 100%; padding: 6px; font-size: 13px; line-height: 1.4;
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    outline: none; word-break: break-word;
+  }
+  .cell .placeholder { font-size: 11px; color: var(--text-muted); pointer-events: none; }
+  .cell .loading-badge { font-size: 10px; color: var(--text-muted); pointer-events: none; }
+  .cell .role-tag {
+    position: absolute; top: 3px; left: 4px; font-size: 9px; padding: 1px 5px;
+    border-radius: 4px; background: var(--surface); color: var(--text-muted);
+    border: 1px solid var(--line); cursor: pointer; opacity: .75; z-index: 2;
+  }
+  .cell .role-tag:hover { opacity: 1; border-color: var(--primary); color: var(--text); }
+  .cell .clear-btn {
+    position: absolute; top: 3px; right: 3px; width: 18px; height: 18px; border-radius: 50%;
+    background: rgba(0,0,0,0.55); color: #fff; border: none; font-size: 11px; line-height: 18px;
+    padding: 0; display: none; cursor: pointer;
+  }
+  .cell:hover .clear-btn { display: block; }
+  .cell .fit-btn {
+    position: absolute; bottom: 3px; right: 3px; font-size: 9.5px; padding: 2px 7px;
+    border-radius: 10px; background: rgba(0,0,0,0.6); color: #fff; border: none;
+    display: none; cursor: pointer; line-height: 1.5; white-space: nowrap;
+  }
+  .cell:hover .fit-btn { display: block; }
+  .cell .fontsize-controls {
+    position: absolute; bottom: 3px; left: 3px; display: none; gap: 3px;
+  }
+  .cell:hover .fontsize-controls { display: flex; }
+  .cell .fs-btn {
+    font-size: 9.5px; padding: 2px 6px; border-radius: 10px;
+    background: rgba(0,0,0,0.6); color: #fff; border: none;
+    cursor: pointer; line-height: 1.5; white-space: nowrap;
+  }
+
+  .row-controls, .col-controls { display: flex; gap: 6px; }
+
+  #printArea { display: none; }
+  .previewing #printArea {
+    display: block;
+  }
+  .print-sheet {
+    margin: 24px auto; background: #fff; color: #2B2620;
+    padding: 6mm; border-radius: 4px; box-shadow: var(--shadow);
+    box-sizing: content-box; overflow: hidden;
+  }
+  .previewing main#app { display: block; }
+  .print-grid { display: grid; }
+  .print-cell {
+    border: 1px solid #D8CFBE; border-radius: 6px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center; background: #FAF7F0;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .print-cell.print-cell-blank { border: none; background: transparent; }
+  .print-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .print-cell .pt { padding: 4px; font-size: 12px; text-align: center; word-break: break-word; }
+  .grid[data-fit="contain"] .cell img,
+  .print-grid[data-fit="contain"] .print-cell img {
+    object-fit: contain;
+    background: var(--surface-2);
+  }
+
+  @media print {
+    /* visibility:hidden だと要素の高さがレイアウトに残ってしまい、隠しているはずの
+       編集画面の分だけ余計な白紙ページができてしまうため、display:none で
+       要素ごと取り除く。main#app は display:flex かつ min-height 指定があるため
+       これも解除し、印刷エリアの実際の大きさだけがページ高さになるようにする。 */
+    header.topbar, #previewFloating, #toastStack, #loadingOverlay,
+    #sidebar, #editor, #measureSheet { display: none !important; }
+    main#app { display: block !important; min-height: 0 !important; }
+    #printArea { display: block !important; }
+    .print-sheet { box-shadow: none; margin: 0 auto; }
+  }
+
+  @media (max-width: 760px) {
+    main#app { flex-direction: column; }
+    #sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--line); }
+  }
+
+  .note { font-size: 12px; color: var(--text-muted); margin-top: 16px; line-height: 1.7; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  .warning-banner {
+    display: none;
+    background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+    border: 1px solid var(--danger); color: var(--danger);
+    border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; line-height: 1.6;
+  }
+  .warning-banner.info {
+    background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+    border-color: var(--primary); color: var(--primary);
+  }
+  .toast-stack {
+    position: fixed; bottom: 18px; right: 18px; z-index: 100;
+    display: flex; flex-direction: column; gap: 8px; max-width: 360px;
+  }
+  .toast {
+    background: var(--text); color: var(--bg); padding: 10px 14px; border-radius: 8px;
+    font-size: 13px; box-shadow: var(--shadow); line-height: 1.6;
+    animation: toast-in .15s ease-out;
+  }
+  .toast.error { background: var(--danger); color: #fff; }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  .storage-meter { font-size: 11.5px; color: var(--text-muted); }
+  .storage-meter .bar { display:inline-block; width: 70px; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; vertical-align: middle; margin-right: 6px; }
+  .storage-meter .bar > span { display:block; height: 100%; background: var(--primary); }
+  .storage-meter.warn .bar > span { background: var(--danger); }
+
+  #loadingOverlay {
+    position: fixed; inset: 0; background: rgba(33,30,25,0.35); z-index: 200;
+    display: none; align-items: center; justify-content: center;
+  }
+  #loadingOverlay.show { display: flex; }
+  #loadingOverlay .box {
+    background: var(--surface); color: var(--text); padding: 18px 26px; border-radius: 10px;
+    box-shadow: var(--shadow); font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">みとおしボード <small>Asiz 内利用・端末内保存</small></div>
+  <div class="topbar-actions">
+    <span class="storage-meter" id="storageMeter"></span>
+    <div class="group" style="margin-right:4px;">
+      <label style="font-size:12.5px; color:var(--text-muted);">印刷の向き</label>
+      <select id="orientationSelect">
+        <option value="landscape">A4横</option>
+        <option value="portrait">A4縦</option>
+      </select>
+    </div>
+    <button id="btnOpen" class="ghost">開く</button>
+    <button id="btnSave" class="ghost">保存</button>
+    <button id="btnPreview" class="ghost">プレビュー</button>
+    <button id="btnPrint" class="primary">印刷</button>
+    <button id="btnReset" class="ghost">リセット</button>
+    <input type="file" id="openFileInput" accept="application/json,.json" style="display:none">
+  </div>
+</header>
+
+<div class="preview-floating" id="previewFloating">
+  <button id="btnPreviewBack" class="ghost small">編集に戻る</button>
+  <button id="btnPrintFloating" class="primary small">印刷</button>
+</div>
+
+<div class="selected-badge" id="selectedBadge">
+  <img id="selectedBadgeImg" src="" alt="">
+  <div class="sb-text"><b>選択中の画像</b><span id="selectedBadgeName"></span></div>
+  <button class="ghost small" id="selectedBadgeClear">選択解除</button>
+</div>
+
+<main id="app">
+  <aside id="sidebar">
+    <h2>画像一覧</h2>
+    <p class="hint">画像をクリックして選ぶと、下に選択中の画像が表示されます。そのまま配置したいセルをクリックしてください（ドラッグ＆ドロップも使えます）。</p>
+    <label class="upload-btn">
+      ＋ 画像を追加
+      <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple style="display:none">
+    </label>
+    <div class="sidebar-actions">
+      <button class="small ghost" id="btnSelectMode">選択して削除・分類</button>
+    </div>
+    <div class="bulk-bar" id="bulkBar" style="display:none;">
+      <div class="bulk-bar-row">
+        <span class="bulk-count"><span id="selCount">0</span>件選択中</span>
+        <button class="small ghost" id="btnSelectAll">すべて選択</button>
+      </div>
+      <div class="bulk-bar-row">
+        <select id="bulkCategorySelect" class="small"></select>
+        <button class="small ghost" id="btnApplyCategory">このカテゴリにする</button>
+      </div>
+      <div class="bulk-bar-row">
+        <button class="small danger" id="btnDeleteSelected">削除</button>
+        <button class="small ghost" id="btnCancelSelect">キャンセル</button>
+      </div>
+    </div>
+    <div class="cat-bar" id="catBar"></div>
+    <div id="imageList"></div>
+  </aside>
+
+  <section id="editor">
+    <div class="toolbar">
+      <div class="group">
+        <label>テンプレート</label>
+        <select id="templateSelect"></select>
+      </div>
+      <div class="group">
+        <label class="upload-btn" style="margin:0; padding:8px 14px; display:inline-block;">
+          Excelから読み込む
+          <input type="file" id="xlsxInput" accept=".xlsx,.xlsm" style="display:none">
+        </label>
+      </div>
+      <div class="group">
+        <label>画像の収め方</label>
+        <select id="fitSelect">
+          <option value="cover">トリミングして埋める</option>
+          <option value="contain">全体を欠けずに収める</option>
+        </select>
+      </div>
+      <div class="group">
+        <label>文字サイズ（既定）</label>
+        <input type="range" id="fontSizeRange" min="10" max="120" value="13">
+        <span class="tpl-meta" id="fontSizeValue">13px</span>
+      </div>
+      <div class="group" id="importedActions" style="display:none;">
+        <button class="small" id="btnRenameTpl">名前を変更</button>
+        <button class="small danger" id="btnDeleteTpl">このテンプレートを削除</button>
+      </div>
+      <div class="group" id="tplMetaGroup"><span class="tpl-meta" id="tplMeta"></span></div>
+    </div>
+
+    <div class="toolbar" id="simpleControls">
+      <div class="group row-controls">
+        <label>行</label>
+        <button class="small" id="rowMinus">－</button><span id="rowCount">4</span><button class="small" id="rowPlus">＋</button>
+      </div>
+      <div class="group col-controls">
+        <label>列</label>
+        <button class="small" id="colMinus">－</button><span id="colCount">4</span><button class="small" id="colPlus">＋</button>
+      </div>
+      <div class="group size-inputs">
+        <label>列幅(px)</label>
+        <div class="size-input-list" id="colWidthList"></div>
+      </div>
+      <div class="group size-inputs">
+        <label>行高(px)</label>
+        <div class="size-input-list" id="rowHeightList"></div>
+      </div>
+    </div>
+
+    <div class="warning-banner" id="overflowWarning"></div>
+    <div class="grid-wrap"><div class="grid" id="editGrid"></div></div>
+
+    <p class="note" id="ruleNote">
+      画像や取り込んだExcelテンプレートは、このパソコン内（ブラウザのデータ保存領域）にのみ保存され、外部には送信されません。空欄の文字セルはクリックするとその場で文字入力できます。大きな画像は保存時に自動で縮小されます。
+    </p>
+  </section>
+
+  <div id="printArea"></div>
+  <div id="measureSheet" style="position:absolute; visibility:hidden; pointer-events:none; top:-99999px; left:-99999px; padding:0;"></div>
+</main>
+
+<div class="toast-stack" id="toastStack"></div>
+<div id="loadingOverlay"><div class="box" id="loadingOverlayText">読み込み中…</div></div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ============================================================
+  // 定数
+  // ============================================================
+  const DB_NAME = "mitooshi_board_db";
+  const DB_VERSION = 1;
+  const IMAGE_STORE = "images";
+  const STATE_STORE = "state";
+  const STATE_KEY = "main";
+  const MAX_IMAGE_DIMENSION = 1600;   // 保存前に縮小する最大の縦横px
+  const IMAGE_JPEG_QUALITY = 0.85;
+  const MM_PX = 96 / 25.4;
+
+  // ============================================================
+  // トースト通知（画面右下にエラー・お知らせを表示）
+  // ============================================================
+  function showToast(message, type){
+    const stack = document.getElementById("toastStack");
+    const el = document.createElement("div");
+    el.className = "toast" + (type === "error" ? " error" : "");
+    el.textContent = message;
+    stack.appendChild(el);
+    setTimeout(() => { el.remove(); }, type === "error" ? 6000 : 3500);
+  }
+  function showLoading(text){
+    const ov = document.getElementById("loadingOverlay");
+    document.getElementById("loadingOverlayText").textContent = text || "読み込み中…";
+    ov.classList.add("show");
+  }
+  function hideLoading(){
+    document.getElementById("loadingOverlay").classList.remove("show");
+  }
+
+  // ============================================================
+  // IndexedDB ラッパー
+  //   images ストア: { id, name, blob, mime, w, h, createdAt }
+  //   state  ストア: { key:"main", data: {...アプリの状態(画像本体は含まない)...} }
+  // ============================================================
+  let dbPromise = null;
+  function openDB(){
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise((resolve, reject) => {
+      if (!window.indexedDB){
+        reject(new Error("このブラウザはIndexedDBに対応していません。"));
+        return;
+      }
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(IMAGE_STORE)){
+          db.createObjectStore(IMAGE_STORE, { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains(STATE_STORE)){
+          db.createObjectStore(STATE_STORE, { keyPath: "key" });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error || new Error("データベースを開けませんでした。"));
+    });
+    return dbPromise;
+  }
+  function idbRequest(storeName, mode, fn){
+    return openDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, mode);
+      const store = tx.objectStore(storeName);
+      let result;
+      try {
+        result = fn(store);
+      } catch(err){ reject(err); return; }
+      tx.oncomplete = () => resolve(result && result.result !== undefined ? result.result : result);
+      tx.onerror = () => reject(tx.error || new Error("データベース処理に失敗しました。"));
+      tx.onabort = () => reject(tx.error || new Error("データベース処理が中断されました。"));
+    }));
+  }
+  function idbGetAllImages(){
+    return openDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction(IMAGE_STORE, "readonly");
+      const store = tx.objectStore(IMAGE_STORE);
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    }));
+  }
+  function idbGetImage(id){
+    return openDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction(IMAGE_STORE, "readonly");
+      const store = tx.objectStore(IMAGE_STORE);
+      const req = store.get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    }));
+  }
+  function idbPutImage(record){
+    return idbRequest(IMAGE_STORE, "readwrite", store => store.put(record));
+  }
+  function idbDeleteImage(id){
+    return idbRequest(IMAGE_STORE, "readwrite", store => store.delete(id));
+  }
+  function idbGetState(){
+    return openDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction(STATE_STORE, "readonly");
+      const store = tx.objectStore(STATE_STORE);
+      const req = store.get(STATE_KEY);
+      req.onsuccess = () => resolve(req.result ? req.result.data : null);
+      req.onerror = () => reject(req.error);
+    }));
+  }
+  function idbPutState(data){
+    return idbRequest(STATE_STORE, "readwrite", store => store.put({ key: STATE_KEY, data }));
+  }
+  function idbClearAll(){
+    return openDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction([IMAGE_STORE, STATE_STORE], "readwrite");
+      tx.objectStore(IMAGE_STORE).clear();
+      tx.objectStore(STATE_STORE).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    }));
+  }
+
+  // 保存容量の目安表示（対応ブラウザのみ）
+  async function updateStorageMeter(){
+    const el = document.getElementById("storageMeter");
+    if (!navigator.storage || !navigator.storage.estimate){ el.textContent = ""; return; }
+    try {
+      const { usage, quota } = await navigator.storage.estimate();
+      if (!quota){ el.textContent = ""; return; }
+      const pct = Math.min(100, Math.round((usage / quota) * 100));
+      const mb = (usage / (1024*1024)).toFixed(1);
+      el.classList.toggle("warn", pct >= 85);
+      el.innerHTML = `<span class="bar"><span style="width:${pct}%"></span></span>使用量 約${mb}MB（${pct}%）`;
+    } catch(e){ el.textContent = ""; }
+  }
+
+  // ============================================================
+  // 画像の縮小（Canvas）。失敗時は元のBlobをそのまま返す。
+  // ============================================================
+  function loadImageFromBlob(blob){
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => { resolve(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("画像を読み込めませんでした。ファイルが壊れている可能性があります。")); };
+      img.src = url;
+    });
+  }
+  async function compressImageBlob(file){
+    const img = await loadImageFromBlob(file);
+    const srcUrl = img.src;
+    try {
+      let { width, height } = img;
+      const longSide = Math.max(width, height);
+      let targetW = width, targetH = height;
+      if (longSide > MAX_IMAGE_DIMENSION){
+        const scale = MAX_IMAGE_DIMENSION / longSide;
+        targetW = Math.round(width * scale);
+        targetH = Math.round(height * scale);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = targetW; canvas.height = targetH;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, targetW, targetH);
+      const preferJpeg = file.type !== "image/png" && file.type !== "image/gif";
+      const mime = preferJpeg ? "image/jpeg" : "image/png";
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, mime, IMAGE_JPEG_QUALITY));
+      if (!blob) throw new Error("画像の圧縮に失敗しました。");
+      return { blob, mime, w: targetW, h: targetH };
+    } catch(err){
+      // 圧縮に失敗した場合は元の画像をそのまま使う
+      return { blob: file, mime: file.type || "image/png", w: img.width, h: img.height };
+    } finally {
+      URL.revokeObjectURL(srcUrl);
+    }
+  }
+
+  // ============================================================
+  // 初期プリセット画像（SVGアイコン。IndexedDBには保存しない軽量な既定画像）
+  // ============================================================
+  function svgIcon(bg, inner){
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+      <rect width="120" height="120" rx="26" fill="${bg}"/>${inner}</svg>`;
+    return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+  }
+  const presetImages = [
+    { name: "歯みがき", src: svgIcon("#6B8F71", `<rect x="52" y="24" width="16" height="56" rx="7" fill="#fff"/><rect x="46" y="16" width="28" height="18" rx="6" fill="#fff"/><line x1="50" y1="10" x2="50" y2="17" stroke="#fff" stroke-width="4" stroke-linecap="round"/><line x1="60" y1="8" x2="60" y2="17" stroke="#fff" stroke-width="4" stroke-linecap="round"/><line x1="70" y1="10" x2="70" y2="17" stroke="#fff" stroke-width="4" stroke-linecap="round"/>`)},
+    { name: "着替え", src: svgIcon("#D98F64", `<path d="M44 26 L60 18 L76 26 L90 36 L80 48 L76 42 L76 96 L44 96 L44 42 L40 48 L30 36 Z" fill="#fff"/>`)},
+    { name: "おやつ", src: svgIcon("#5B85AA", `<path d="M38 44 H82 L76 90 A6 6 0 0 1 70 96 H50 A6 6 0 0 1 44 90 Z" fill="#fff"/><path d="M38 44 Q60 30 82 44" stroke="#fff" stroke-width="6" fill="none" stroke-linecap="round"/><circle cx="88" cy="52" r="10" fill="none" stroke="#fff" stroke-width="5"/>`)},
+    { name: "宿題", src: svgIcon("#C97064", `<path d="M60 34 C52 26 34 26 28 32 V86 C34 80 52 80 60 88 C68 80 86 80 92 86 V32 C86 26 68 26 60 34 Z" fill="#fff"/><line x1="60" y1="34" x2="60" y2="88" stroke="#C97064" stroke-width="3"/>`)},
+    { name: "あそび", src: svgIcon("#7C9885", `<circle cx="60" cy="60" r="34" fill="#fff"/><path d="M60 26 A34 34 0 0 1 86 78" stroke="#7C9885" stroke-width="4" fill="none"/><path d="M60 94 A34 34 0 0 1 34 42" stroke="#7C9885" stroke-width="4" fill="none"/>`)},
+    { name: "トイレ", src: svgIcon("#A98467", `<rect x="40" y="24" width="40" height="16" rx="8" fill="#fff"/><path d="M44 40 H76 L72 92 A6 6 0 0 1 66 98 H54 A6 6 0 0 1 48 92 Z" fill="#fff"/>`)}
+  ];
+
+  // ============================================================
+  // アプリの状態
+  //   state.images 内の各画像は { id, name, isPreset:true, src } か
+  //   { id, name, isPreset:false } のみを保持し、実データ(Blob)はIndexedDBのimagesストアに置く。
+  //   セルの内容は { type:"image", imageId, fit } / { type:"text", text }
+  // ============================================================
+  function defaultState(){
+    return {
+      activeTemplateId: "simple",
+      imageFit: "cover",
+      textFontSize: 13,
+      printOrientation: "landscape",
+      templates: {
+        simple: { name: "シンプルグリッド（手動設定）", type: "simple", rows: 4, cols: 4,
+          colWidths: [130,130,130,130], rowHeights: [100,100,100,100], cells: {} }
+      },
+      imageOrder: presetImages.map((p,i) => "preset_"+i),
+      categories: [],
+      imageCategory: {}
+    };
+  }
+
+  let state = defaultState();
+  // id -> { id, name, isPreset, objectUrl }  … 画像の表示用インデックス（本体はDBかプリセット定数）
+  let imageIndex = new Map();
+  let selectedImageId = null;
+  let uploadCounter = 0;
+  let saveTimer = null;
+  let dbAvailable = true;
+  let selectionMode = false;
+  let selectedForDeletion = new Set();
+  let activeCategoryFilter = "all"; // "all" | "uncat" | カテゴリ名
+
+  function activeTpl(){ return state.templates[state.activeTemplateId]; }
+  function cellKey(r,c){ return r + "_" + c; }
+  function effectiveFontSize(data){ return (data && data.fontSize) || state.textFontSize || 13; }
+
+  function imageSrc(id){
+    if (!id) return "";
+    const entry = imageIndex.get(id);
+    if (!entry) return "";
+    if (entry.isPreset) return entry.src;
+    return entry.objectUrl || "";
+  }
+  function imageName(id){
+    const entry = imageIndex.get(id);
+    return entry ? entry.name : "";
+  }
+
+  // ---------- 状態の保存/復元 ----------
+  function scheduleSave(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(doSave, 300);
+  }
+  async function doSave(){
+    if (!dbAvailable) return;
+    try {
+      await idbPutState(state);
+      updateStorageMeter();
+    } catch(err){
+      console.error(err);
+      showToast("保存に失敗しました。空き容量が不足している可能性があります。使わなくなった画像を削除してください。", "error");
+    }
+  }
+
+  // 旧バージョン（列幅・行高が cellW/cellH の一つの数値だった頃）のデータを、
+  // 列ごと・行ごとの配列（colWidths/rowHeights）に変換する。
+  function migrateSimpleTemplate(tpl){
+    if (tpl.type !== "simple") return;
+    if (!Array.isArray(tpl.colWidths)){
+      const w = tpl.cellW || 130;
+      tpl.colWidths = new Array(tpl.cols).fill(w);
+    }
+    if (!Array.isArray(tpl.rowHeights)){
+      const h = tpl.cellH || 100;
+      tpl.rowHeights = new Array(tpl.rows).fill(h);
+    }
+    while (tpl.colWidths.length < tpl.cols) tpl.colWidths.push(tpl.colWidths[tpl.colWidths.length-1] || 130);
+    while (tpl.colWidths.length > tpl.cols) tpl.colWidths.pop();
+    while (tpl.rowHeights.length < tpl.rows) tpl.rowHeights.push(tpl.rowHeights[tpl.rowHeights.length-1] || 100);
+    while (tpl.rowHeights.length > tpl.rows) tpl.rowHeights.pop();
+  }
+
+  async function loadState(){
+    try {
+      const saved = await idbGetState();
+      if (saved && saved.templates){
+        state = saved;
+        if (!state.imageOrder) state.imageOrder = [];
+        if (!Array.isArray(state.categories)) state.categories = [];
+        if (!state.imageCategory || typeof state.imageCategory !== "object") state.imageCategory = {};
+      }
+    } catch(err){
+      console.error(err);
+      dbAvailable = false;
+      showToast("保存データの読み込みに失敗しました。このブラウザではIndexedDBが使えない可能性があります。", "error");
+    }
+    Object.values(state.templates).forEach(migrateSimpleTemplate);
+  }
+
+  async function loadImageIndex(){
+    imageIndex = new Map();
+    presetImages.forEach((p,i) => {
+      imageIndex.set("preset_"+i, { id: "preset_"+i, name: p.name, isPreset: true, src: p.src });
+    });
+    if (!dbAvailable) return;
+    try {
+      const rows = await idbGetAllImages();
+      rows.forEach(row => {
+        const objectUrl = URL.createObjectURL(row.blob);
+        imageIndex.set(row.id, { id: row.id, name: row.name, isPreset: false, objectUrl });
+      });
+      // imageOrder に登場しないアップロード画像があれば末尾に追加（データ不整合対策）。
+      // ただしセルに直接ドラッグして配置しただけの画像（hidden）は一覧に出さない。
+      rows.forEach(row => {
+        if (!row.hidden && state.imageOrder.indexOf(row.id) === -1) state.imageOrder.push(row.id);
+      });
+      // 実体が既に無い画像IDはリストから外す
+      state.imageOrder = state.imageOrder.filter(id => imageIndex.has(id));
+    } catch(err){
+      console.error(err);
+      showToast("画像の読み込み中にエラーが発生しました。", "error");
+    }
+  }
+
+  // ---------- sidebar ----------
+  // 画像一覧からの削除（プリセット画像は一覧から外すだけ、アップロード画像はDBからも削除）
+  async function removeImagesFromLibrary(ids){
+    for (const id of ids){
+      const entry = imageIndex.get(id);
+      state.imageOrder = state.imageOrder.filter(x => x !== id);
+      delete state.imageCategory[id];
+      if (selectedImageId === id) selectedImageId = null;
+      selectedForDeletion.delete(id);
+      if (entry && !entry.isPreset){
+        try { await idbDeleteImage(id); } catch(err){ console.error(err); showToast("画像の削除に失敗しました。", "error"); }
+        if (entry.objectUrl) URL.revokeObjectURL(entry.objectUrl);
+        imageIndex.delete(id);
+      }
+    }
+    scheduleSave();
+    renderSidebar();
+    updateStorageMeter();
+  }
+
+  // ---------- カテゴリ（フォルダ相当） ----------
+  function categoryOf(id){ return state.imageCategory[id] || null; }
+
+  function filteredImageOrder(){
+    if (activeCategoryFilter === "all") return state.imageOrder;
+    if (activeCategoryFilter === "uncat") return state.imageOrder.filter(id => !categoryOf(id));
+    return state.imageOrder.filter(id => categoryOf(id) === activeCategoryFilter);
+  }
+
+  function addCategory(){
+    const name = prompt("新しいカテゴリ名を入力してください（例：あさのしたく／あそび／せいかつ）");
+    if (!name) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (state.categories.includes(trimmed)){ showToast("同じ名前のカテゴリが既にあります。", "error"); return; }
+    state.categories.push(trimmed);
+    scheduleSave();
+    renderSidebar();
+  }
+
+  function deleteCategory(name){
+    if (!confirm(`カテゴリ「${name}」を削除します。このカテゴリの画像は「未分類」に戻ります（画像自体は削除されません）。よろしいですか？`)) return;
+    state.categories = state.categories.filter(c => c !== name);
+    Object.keys(state.imageCategory).forEach(id => {
+      if (state.imageCategory[id] === name) delete state.imageCategory[id];
+    });
+    if (activeCategoryFilter === name) activeCategoryFilter = "all";
+    scheduleSave();
+    renderSidebar();
+  }
+
+  function renderCategoryChips(){
+    const bar = document.getElementById("catBar");
+    bar.innerHTML = "";
+    const makeChip = (label, value, deletable) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "cat-chip" + (activeCategoryFilter === value ? " active" : "");
+      chip.innerHTML = deletable ? `<span>${label}</span><span class="cat-del" title="カテゴリを削除">×</span>` : `<span>${label}</span>`;
+      chip.addEventListener("click", (e) => {
+        if (deletable && e.target.closest(".cat-del")){ e.stopPropagation(); deleteCategory(value); return; }
+        activeCategoryFilter = value;
+        renderSidebar();
+      });
+      bar.appendChild(chip);
+    };
+    makeChip("すべて", "all", false);
+    state.categories.forEach(c => makeChip(c, c, true));
+    makeChip("未分類", "uncat", false);
+    const addChip = document.createElement("button");
+    addChip.type = "button";
+    addChip.className = "cat-chip add";
+    addChip.textContent = "＋ カテゴリを追加";
+    addChip.addEventListener("click", addCategory);
+    bar.appendChild(addChip);
+  }
+
+  function updateBulkBar(){
+    document.getElementById("bulkBar").style.display = selectionMode ? "flex" : "none";
+    document.getElementById("selCount").textContent = selectedForDeletion.size;
+    const base = filteredImageOrder();
+    const allSelected = base.length > 0 && base.every(id => selectedForDeletion.has(id));
+    document.getElementById("btnSelectAll").textContent = allSelected ? "選択解除" : "すべて選択";
+    document.getElementById("btnSelectMode").textContent = selectionMode ? "選択をやめる" : "選択して削除・分類";
+    const sel = document.getElementById("bulkCategorySelect");
+    const prevValue = sel.value;
+    sel.innerHTML = `<option value="__uncat__">未分類にする</option>` + state.categories.map(c => `<option value="${c}">${c}</option>`).join("");
+    if (Array.from(sel.options).some(o => o.value === prevValue)) sel.value = prevValue;
+  }
+
+  function updateSelectedBadge(){
+    const badge = document.getElementById("selectedBadge");
+    const entry = selectedImageId ? imageIndex.get(selectedImageId) : null;
+    if (!entry){
+      badge.classList.remove("show");
+      return;
+    }
+    document.getElementById("selectedBadgeImg").src = entry.isPreset ? entry.src : entry.objectUrl;
+    document.getElementById("selectedBadgeName").textContent = entry.name;
+    badge.classList.add("show");
+  }
+
+  function renderSidebar(){
+    const list = document.getElementById("imageList");
+    list.innerHTML = "";
+    updateBulkBar();
+    updateSelectedBadge();
+    renderCategoryChips();
+    if (!state.imageOrder.length){
+      list.innerHTML = `<div class="empty-hint">まだ画像がありません。<br>「＋ 画像を追加」から追加してください。</div>`;
+      return;
+    }
+    const visible = filteredImageOrder();
+    if (!visible.length){
+      list.innerHTML = `<div class="empty-hint">このカテゴリにはまだ画像がありません。</div>`;
+      return;
+    }
+    visible.forEach(id => {
+      const entry = imageIndex.get(id);
+      if (!entry) return;
+      const isChecked = selectedForDeletion.has(id);
+      const cat = categoryOf(id);
+      const div = document.createElement("div");
+      div.className = "thumb"
+        + (selectedImageId === id ? " selected" : "")
+        + (selectionMode ? " selecting" : "")
+        + (isChecked ? " check-selected" : "");
+      div.draggable = !selectionMode;
+      const src = entry.isPreset ? entry.src : entry.objectUrl;
+      div.innerHTML = `<img src="${src}" alt="${entry.name}" loading="lazy"><div class="cap">${entry.name}${cat ? `<span class="cap-cat">${cat}</span>` : ""}</div><input type="checkbox" class="sel-check" title="選択"><button class="del-btn" title="削除">×</button>`;
+      div.querySelector(".sel-check").checked = isChecked;
+      div.addEventListener("dragstart", e => { if (!selectionMode) e.dataTransfer.setData("text/plain", id); });
+      div.addEventListener("click", (e) => {
+        if (e.target.closest(".del-btn")) return;
+        if (selectionMode){
+          if (selectedForDeletion.has(id)) selectedForDeletion.delete(id);
+          else selectedForDeletion.add(id);
+          renderSidebar();
+          return;
+        }
+        selectedImageId = (selectedImageId === id) ? null : id; renderSidebar();
+      });
+      const delBtn = div.querySelector(".del-btn");
+      delBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!confirm(`「${entry.name}」を画像一覧から削除します。すでにセルに配置済みの画像はそのまま残ります。よろしいですか？`)) return;
+        await removeImagesFromLibrary([id]);
+      });
+      list.appendChild(div);
+    });
+  }
+
+  document.getElementById("btnSelectMode").addEventListener("click", () => {
+    selectionMode = !selectionMode;
+    selectedForDeletion.clear();
+    if (selectionMode) selectedImageId = null;
+    renderSidebar();
+  });
+  document.getElementById("btnSelectAll").addEventListener("click", () => {
+    const base = filteredImageOrder();
+    const allSelected = base.length > 0 && base.every(id => selectedForDeletion.has(id));
+    if (allSelected) base.forEach(id => selectedForDeletion.delete(id));
+    else base.forEach(id => selectedForDeletion.add(id));
+    renderSidebar();
+  });
+  document.getElementById("btnApplyCategory").addEventListener("click", () => {
+    if (!selectedForDeletion.size){ showToast("画像を選択してください。", "error"); return; }
+    const value = document.getElementById("bulkCategorySelect").value;
+    selectedForDeletion.forEach(id => {
+      if (value === "__uncat__") delete state.imageCategory[id];
+      else state.imageCategory[id] = value;
+    });
+    const count = selectedForDeletion.size;
+    selectedForDeletion.clear();
+    scheduleSave();
+    renderSidebar();
+    showToast(`${count}件の画像を分類しました。`, "success");
+  });
+  document.getElementById("btnDeleteSelected").addEventListener("click", async () => {
+    if (!selectedForDeletion.size) return;
+    if (!confirm(`選択した${selectedForDeletion.size}件の画像を画像一覧から削除します。すでにセルに配置済みの画像はそのまま残ります。よろしいですか？`)) return;
+    await removeImagesFromLibrary(Array.from(selectedForDeletion));
+  });
+  document.getElementById("btnCancelSelect").addEventListener("click", () => {
+    selectionMode = false;
+    selectedForDeletion.clear();
+    renderSidebar();
+  });
+  document.getElementById("selectedBadgeClear").addEventListener("click", () => {
+    selectedImageId = null;
+    renderSidebar();
+  });
+
+  async function addUploadedFiles(files){
+    const accepted = [];
+    const rejected = [];
+    files.forEach(file => {
+      if (file.type && file.type.indexOf("image/") === 0) accepted.push(file);
+      else rejected.push(file);
+    });
+    if (rejected.length){
+      showToast(`画像として認識できないファイルを${rejected.length}件スキップしました（対応形式: PNG / JPEG / WEBP / GIF）。`, "error");
+    }
+    if (!accepted.length) return;
+    showLoading(`画像を読み込んでいます（0/${accepted.length}）…`);
+    let done = 0;
+    for (const file of accepted){
+      try {
+        const { blob, mime, w, h } = await compressImageBlob(file);
+        uploadCounter++;
+        const id = "up_" + Date.now() + "_" + uploadCounter;
+        const name = file.name.replace(/\.[^.]+$/, "") || "画像";
+        await idbPutImage({ id, name, blob, mime, w, h, createdAt: Date.now() });
+        const objectUrl = URL.createObjectURL(blob);
+        imageIndex.set(id, { id, name, isPreset: false, objectUrl });
+        state.imageOrder.push(id);
+      } catch(err){
+        console.error(err);
+        showToast(`「${file.name}」を追加できませんでした：${err.message || "不明なエラー"}`, "error");
+      }
+      done++;
+      showLoading(`画像を読み込んでいます（${done}/${accepted.length}）…`);
+    }
+    hideLoading();
+    scheduleSave();
+    renderSidebar();
+    updateStorageMeter();
+  }
+
+  // ---------- cell content helpers ----------
+  function setCellImage(r,c,imageId,fit){ activeTpl().cells[cellKey(r,c)] = { type: "image", imageId, fit: fit || state.imageFit || "cover" }; scheduleSave(); renderAll(); }
+  function setCellText(r,c,text){ activeTpl().cells[cellKey(r,c)] = { type: "text", text }; scheduleSave(); }
+  function clearCell(r,c){ delete activeTpl().cells[cellKey(r,c)]; scheduleSave(); renderAll(); }
+
+  function roleOf(tpl, r, c){
+    if (tpl.type === "simple") return "free";
+    const role = tpl.roles && tpl.roles[cellKey(r,c)];
+    return role || "blank";
+  }
+  function isCovered(tpl, r, c){
+    return tpl.covered && tpl.covered.indexOf(cellKey(r,c)) !== -1;
+  }
+  function spanOf(tpl, r, c){
+    if (!tpl.spans) return {rowspan:1, colspan:1};
+    return tpl.spans[cellKey(r,c)] || {rowspan:1, colspan:1};
+  }
+
+  // 自動判定がうまくいかない場合の手当て：クリックのたびに 画像→文字→空欄 の順で手動切り替え
+  const ROLE_CYCLE = ["image", "text", "blank"];
+  const ROLE_LABEL = { image: "画像", text: "文字", blank: "空欄" };
+  function cycleRole(tpl, r, c){
+    const key = cellKey(r, c);
+    const cur = roleOf(tpl, r, c);
+    const next = ROLE_CYCLE[(ROLE_CYCLE.indexOf(cur) + 1) % ROLE_CYCLE.length];
+    if (!tpl.roles) tpl.roles = {};
+    tpl.roles[key] = next;
+    delete tpl.cells[key];
+    scheduleSave();
+    renderAll();
+  }
+
+  // ---------- edit grid ----------
+  async function handleDroppedFiles(r, c, fileList){
+    const files = Array.from(fileList).filter(f => f.type && f.type.indexOf("image/") === 0);
+    if (!files.length){
+      showToast("画像ファイルのみドラッグ＆ドロップできます。", "error");
+      return;
+    }
+    const file = files[0];
+    try {
+      const { blob, mime, w, h } = await compressImageBlob(file);
+      uploadCounter++;
+      const id = "up_" + Date.now() + "_" + uploadCounter;
+      const name = file.name.replace(/\.[^.]+$/, "") || "画像";
+      // セルへの直接ドラッグ＆ドロップは、その場限りの配置として扱い画像一覧には追加しない
+      await idbPutImage({ id, name, blob, mime, w, h, createdAt: Date.now(), hidden: true });
+      const objectUrl = URL.createObjectURL(blob);
+      imageIndex.set(id, { id, name, isPreset: false, objectUrl });
+      setCellImage(r,c,id);
+      updateStorageMeter();
+    } catch(err){
+      console.error(err);
+      showToast(`「${file.name}」を配置できませんでした：${err.message || "不明なエラー"}`, "error");
+    }
+  }
+
+  function renderEditGrid(){
+    const tpl = activeTpl();
+    const grid = document.getElementById("editGrid");
+    grid.innerHTML = "";
+    grid.dataset.fit = state.imageFit || "cover";
+
+    grid.style.gridTemplateColumns = tpl.colWidths.map(w => w + "px").join(" ");
+    grid.style.gridTemplateRows = tpl.rowHeights.map(h => h + "px").join(" ");
+
+    for (let r=0; r<tpl.rows; r++){
+      for (let c=0; c<tpl.cols; c++){
+        if (tpl.type !== "simple" && isCovered(tpl, r, c)) continue;
+        const role = roleOf(tpl, r, c);
+        const data = tpl.cells[cellKey(r,c)];
+        const cell = document.createElement("div");
+        cell.className = "cell" + (data ? " filled" : "") + (role === "blank" ? " cell-blank" : "");
+
+        if (tpl.type !== "simple"){
+          const sp = spanOf(tpl, r, c);
+          cell.style.gridColumn = `${c+1} / span ${sp.colspan}`;
+          cell.style.gridRow = `${r+1} / span ${sp.rowspan}`;
+        }
+
+        if (role !== "blank"){
+          if (data && data.type === "image"){
+            const fit = data.fit || state.imageFit || "cover";
+            const src = imageSrc(data.imageId);
+            if (src){
+              cell.innerHTML = `<img src="${src}" alt="" style="object-fit:${fit}"><button class="clear-btn" title="削除">×</button><button class="fit-btn" title="収め方を切り替え">${fit === "cover" ? "全体表示に" : "トリミングに"}</button>`;
+            } else {
+              cell.innerHTML = `<span class="loading-badge">画像が見つかりません</span><button class="clear-btn" title="削除">×</button>`;
+            }
+          } else if (data && data.type === "text"){
+            cell.innerHTML = `<div class="text-content" contenteditable="true" style="font-size:${effectiveFontSize(data)}px">${(data.text||"").replace(/</g,"&lt;")}</div><button class="clear-btn" title="削除">×</button><div class="fontsize-controls"><button class="fs-btn" data-dir="-1" title="文字を小さく">A－</button><button class="fs-btn" data-dir="1" title="文字を大きく">A＋</button></div>`;
+          } else if (role === "text"){
+            cell.innerHTML = `<div class="text-content" contenteditable="true" style="font-size:${effectiveFontSize(null)}px"></div>`;
+          } else {
+            cell.innerHTML = `<span class="placeholder">＋</span>`;
+          }
+        }
+        if (tpl.type !== "simple"){
+          const tag = document.createElement("button");
+          tag.type = "button";
+          tag.className = "role-tag";
+          tag.title = "クリックで種類を切り替え（画像／文字／空欄）";
+          tag.textContent = ROLE_LABEL[role] || role;
+          tag.addEventListener("click", (e) => {
+            e.stopPropagation();
+            cycleRole(tpl, r, c);
+          });
+          cell.appendChild(tag);
+        }
+
+        if (role === "image" || role === "free"){
+          cell.addEventListener("dragover", e => { e.preventDefault(); cell.classList.add("drag-over"); });
+          cell.addEventListener("dragleave", () => cell.classList.remove("drag-over"));
+          cell.addEventListener("drop", e => {
+            e.preventDefault(); cell.classList.remove("drag-over");
+            if (e.dataTransfer.files && e.dataTransfer.files.length){
+              handleDroppedFiles(r, c, e.dataTransfer.files);
+              return;
+            }
+            const id = e.dataTransfer.getData("text/plain");
+            if (imageIndex.has(id)) setCellImage(r,c,id);
+          });
+          cell.addEventListener("click", (e) => {
+            if (e.target.closest(".clear-btn")) return;
+            if (e.target.closest(".text-content")) return;
+            if (selectedImageId){
+              if (imageIndex.has(selectedImageId)) setCellImage(r,c,selectedImageId);
+              return;
+            }
+            if (role === "free"){
+              if (!data){
+                setCellText(r,c,"");
+                renderEditGrid();
+                requestAnimationFrame(() => {
+                  const nodes = document.querySelectorAll("#editGrid .cell");
+                  const idx = r*tpl.cols + c;
+                  const ed = nodes[idx] && nodes[idx].querySelector(".text-content");
+                  if (ed) ed.focus();
+                });
+              } else if (data.type === "text"){
+                const ed = cell.querySelector(".text-content");
+                if (ed) ed.focus();
+              }
+            }
+          });
+        }
+        const textEl = cell.querySelector(".text-content");
+        if (textEl){
+          textEl.addEventListener("input", () => { setCellText(r,c, textEl.innerText); renderPrintArea(); checkOverflow(); });
+        }
+        cell.querySelectorAll(".fs-btn").forEach(btn => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const cur = tpl.cells[cellKey(r,c)];
+            if (!cur || cur.type !== "text") return;
+            const base = cur.fontSize || state.textFontSize || 13;
+            cur.fontSize = Math.max(9, Math.min(120, base + Number(btn.dataset.dir) * 2));
+            scheduleSave();
+            renderAll();
+          });
+        });
+        const clearBtn = cell.querySelector(".clear-btn");
+        if (clearBtn) clearBtn.addEventListener("click", (e) => { e.stopPropagation(); clearCell(r,c); });
+        const fitBtn = cell.querySelector(".fit-btn");
+        if (fitBtn){
+          fitBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const cur = tpl.cells[cellKey(r,c)];
+            if (!cur) return;
+            cur.fit = (cur.fit || state.imageFit || "cover") === "cover" ? "contain" : "cover";
+            scheduleSave();
+            renderAll();
+          });
+        }
+
+        grid.appendChild(cell);
+      }
+    }
+  }
+
+  // ---------- 印刷エリア（A4 1ページ固定・Excelと同様に自動縮小してはみ出さないようにする） ----------
+  // 印刷時のCSS transformはChromeのページ分割計算とかみ合わないことがあるため使わず、
+  // 縮小率をあらかじめ計算してから、そのサイズでグリッドを組み立てる。
+  const PRINT_GAP_PX = 6;
+  const SHEET_PAD_MM = 6; // .print-sheet の padding と合わせる
+
+  function sheetNaturalSize(tpl){
+    const sumW = tpl.colWidths.reduce((a,b) => a+b, 0);
+    const sumH = tpl.rowHeights.reduce((a,b) => a+b, 0);
+    return {
+      w: sumW + (tpl.cols - 1) * PRINT_GAP_PX,
+      h: sumH + (tpl.rows - 1) * PRINT_GAP_PX
+    };
+  }
+
+  // 用紙からはみ出さない範囲で、縦横比を保ったままできるだけ大きく（必要なら拡大も）表示する倍率を求める。
+  function computeFitScale(tpl){
+    const { contentWmm, contentHmm } = contentHeightPx();
+    const availWpx = (contentWmm - SHEET_PAD_MM*2) * MM_PX;
+    const availHpx = (contentHmm - SHEET_PAD_MM*2) * MM_PX;
+    const { w, h } = sheetNaturalSize(tpl);
+    if (!w || !h) return 1;
+    return Math.min(availWpx / w, availHpx / h);
+  }
+
+  function buildSheetDom(tpl, scale){
+    scale = scale || 1;
+    const wrap = document.createElement("div");
+    wrap.className = "print-sheet";
+
+    const grid = document.createElement("div");
+    grid.className = "print-grid";
+    grid.style.gap = (PRINT_GAP_PX * scale) + "px";
+    // display:grid はブロック要素として親いっぱいに広がろうとするため、
+    // 実際のトラック合計サイズ（縮小後）をそのまま幅・高さに指定して余白ができないようにする
+    const natural = sheetNaturalSize(tpl);
+    // .print-sheet もブロック要素なので、同様に幅を内容に合わせて明示指定する（中央寄せのため）
+    wrap.style.width = (natural.w * scale) + "px";
+    grid.style.width = (natural.w * scale) + "px";
+    grid.style.height = (natural.h * scale) + "px";
+    grid.dataset.fit = state.imageFit || "cover";
+
+    if (tpl.type === "simple"){
+      grid.style.gridTemplateColumns = tpl.colWidths.map(w => (w * scale) + "px").join(" ");
+      grid.style.gridTemplateRows = tpl.rowHeights.map(h => (h * scale) + "px").join(" ");
+      for (let r=0; r<tpl.rows; r++){
+        for (let c=0; c<tpl.cols; c++){
+          const data = tpl.cells[cellKey(r,c)];
+          const cell = document.createElement("div");
+          cell.className = "print-cell";
+          if (data && data.type === "image"){
+            const src = imageSrc(data.imageId);
+            if (src) cell.innerHTML = `<img src="${src}" alt="" style="object-fit:${data.fit || state.imageFit || 'cover'}">`;
+          } else if (data && data.type === "text"){
+            cell.innerHTML = `<div class="pt" style="font-size:${effectiveFontSize(data) * scale}px">${(data.text||"").replace(/</g,"&lt;")}</div>`;
+          }
+          grid.appendChild(cell);
+        }
+      }
+    } else {
+      grid.style.gridTemplateColumns = tpl.colWidths.map(w => (w * scale) + "px").join(" ");
+      grid.style.gridTemplateRows = tpl.rowHeights.map(h => (h * scale) + "px").join(" ");
+      for (let r=0; r<tpl.rows; r++){
+        for (let c=0; c<tpl.cols; c++){
+          if (isCovered(tpl, r, c)) continue;
+          const role = roleOf(tpl, r, c);
+          const sp = spanOf(tpl, r, c);
+          const data = tpl.cells[cellKey(r,c)];
+          const cell = document.createElement("div");
+          cell.className = "print-cell" + (role === "blank" ? " print-cell-blank" : "");
+          cell.style.gridColumn = `${c+1} / span ${sp.colspan}`;
+          cell.style.gridRow = `${r+1} / span ${sp.rowspan}`;
+          if (role !== "blank"){
+            if (data && data.type === "image"){
+              const src = imageSrc(data.imageId);
+              if (src) cell.innerHTML = `<img src="${src}" alt="" style="object-fit:${data.fit || state.imageFit || 'cover'}">`;
+            } else if (data && data.type === "text"){
+              cell.innerHTML = `<div class="pt" style="font-size:${effectiveFontSize(data) * scale}px">${(data.text||"").replace(/</g,"&lt;")}</div>`;
+            }
+          }
+          grid.appendChild(cell);
+        }
+      }
+    }
+    wrap.appendChild(grid);
+    return wrap;
+  }
+
+  function renderPrintArea(){
+    const tpl = activeTpl();
+    const area = document.getElementById("printArea");
+    area.innerHTML = "";
+    const scale = computeFitScale(tpl);
+    area.appendChild(buildSheetDom(tpl, scale));
+  }
+
+  function contentHeightPx(){
+    const o = state.printOrientation || "landscape";
+    const pageWmm = o === "landscape" ? 297 : 210;
+    const pageHmm = o === "landscape" ? 210 : 297;
+    const marginMm = 12;
+    return { contentWmm: pageWmm - marginMm*2, contentHmm: pageHmm - marginMm*2 };
+  }
+
+  function renderAll(){ renderEditGrid(); renderPrintArea(); checkOverflow(); }
+
+  // ---------- toolbar: template select ----------
+  function renderTemplateSelect(){
+    const sel = document.getElementById("templateSelect");
+    sel.innerHTML = "";
+    Object.keys(state.templates).forEach(id => {
+      const opt = document.createElement("option");
+      opt.value = id; opt.textContent = state.templates[id].name;
+      if (id === state.activeTemplateId) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    const tpl = activeTpl();
+    const simpleCtrl = document.getElementById("simpleControls");
+    const importedActions = document.getElementById("importedActions");
+    const tplMeta = document.getElementById("tplMeta");
+    if (tpl.type === "simple"){
+      simpleCtrl.style.display = "flex";
+      importedActions.style.display = "none";
+      tplMeta.textContent = "";
+    } else {
+      simpleCtrl.style.display = "none";
+      importedActions.style.display = "flex";
+      tplMeta.textContent = `${tpl.cols}列 × ${tpl.rows}行（Excelから取り込み）`;
+    }
+  }
+
+  document.getElementById("templateSelect").addEventListener("change", (e) => {
+    if (!state.templates[e.target.value]){
+      showToast("選択したテンプレートが見つかりませんでした。", "error");
+      renderTemplateSelect();
+      return;
+    }
+    state.activeTemplateId = e.target.value;
+    scheduleSave();
+    renderTemplateSelect();
+    syncCounts();
+    renderAll();
+  });
+
+  document.getElementById("btnRenameTpl").addEventListener("click", () => {
+    const tpl = activeTpl();
+    const name = prompt("テンプレート名を入力してください", tpl.name);
+    if (name && name.trim()){ tpl.name = name.trim(); scheduleSave(); renderTemplateSelect(); }
+  });
+  document.getElementById("btnDeleteTpl").addEventListener("click", () => {
+    if (!confirm("このテンプレートを削除します。よろしいですか？")) return;
+    delete state.templates[state.activeTemplateId];
+    state.activeTemplateId = "simple";
+    scheduleSave();
+    renderTemplateSelect();
+    renderAll();
+  });
+
+  // ---------- Excel import ----------
+  function colLetterToNumber(letters){
+    let n = 0;
+    for (let i=0;i<letters.length;i++) n = n*26 + (letters.charCodeAt(i) - 64);
+    return n;
+  }
+  function parseAddr(addr){
+    const m = addr.match(/^([A-Z]+)(\d+)$/);
+    return { col: colLetterToNumber(m[1]), row: parseInt(m[2],10) };
+  }
+  function cellText(cell){
+    const v = cell.value;
+    if (v == null) return "";
+    if (typeof v === "object"){
+      if (v.richText) return v.richText.map(rt => rt.text).join("");
+      if (v.text != null) return String(v.text);
+      if (v.result != null) return String(v.result);
+      return "";
+    }
+    return String(v);
+  }
+  // OOXMLの既定インデックスカラーパレットのうち「黄色」に該当する番号（互換用に重複あり）
+  const YELLOW_INDEXED_COLORS = new Set([5, 13]);
+
+  function colorToRgb(color){
+    if (!color) return null;
+    if (typeof color.argb === "string"){
+      const hex = color.argb.length >= 6 ? color.argb.slice(-6) : null;
+      if (!hex || /[^0-9a-fA-F]/.test(hex)) return null;
+      return {
+        r: parseInt(hex.slice(0,2),16),
+        g: parseInt(hex.slice(2,4),16),
+        b: parseInt(hex.slice(4,6),16),
+      };
+    }
+    if (typeof color.indexed === "number" && YELLOW_INDEXED_COLORS.has(color.indexed)){
+      return { r:255, g:255, b:0 };
+    }
+    // テーマカラー（theme/tint）はワークブックのテーマ定義がないと正確なRGBに解決できないため、
+    // ここでは判定対象にしていない。「標準の色」から選んだ黄色はargbで記録されるため通常は問題ない。
+    return null;
+  }
+
+  function isNearYellow(rgb, tolerance = 40){
+    if (!rgb) return false;
+    return rgb.r >= 255 - tolerance && rgb.g >= 255 - tolerance && rgb.b <= tolerance;
+  }
+
+  function isYellowFill(cell){
+    const f = cell.fill;
+    if (!f) return false;
+    const candidates = [f.fgColor, f.bgColor];
+    if (Array.isArray(f.stops)){
+      f.stops.forEach(stop => stop && candidates.push(stop.color));
+    }
+    return candidates.some(c => isNearYellow(colorToRgb(c)));
+  }
+
+  async function importExcelTemplate(file){
+    if (typeof ExcelJS === "undefined"){
+      showToast("Excel読み込み用の部品を読み込めませんでした。assetsフォルダにexceljs.min.jsがあるかご確認ください。", "error");
+      return;
+    }
+    if (!/\.(xlsx|xlsm)$/i.test(file.name)){
+      showToast("Excelファイル（.xlsx / .xlsm）を選択してください。", "error");
+      return;
+    }
+    showLoading("Excelファイルを読み込んでいます…");
+    let wb;
+    try {
+      const buf = await file.arrayBuffer();
+      wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf);
+    } catch(err){
+      hideLoading();
+      console.error(err);
+      showToast("このExcelファイルを読み込めませんでした。ファイルが壊れていないか、.xlsx形式か確認してください。", "error");
+      return;
+    }
+    try {
+      const ws = wb.worksheets[0];
+      if (!ws || !ws.dimensions){
+        showToast("シートにデータが見つかりませんでした。1つ目のシートにテンプレートを作成してください。", "error");
+        return;
+      }
+      const dim = ws.dimensions;
+      // ws.dimensions は「値が入っているセル」だけを基準に計算されるため、文字を持たず
+      // 塗りつぶし色だけが設定された画像セルはこの範囲から漏れてしまうことがある。
+      // そのため、結合セルの範囲や実際のセルの塗り状態も見て使用範囲を広げ直す。
+      const earlyMergeList = (ws.model && ws.model.merges) || [];
+      let mergeMinRow = Infinity, mergeMaxRow = -Infinity, mergeMinCol = Infinity, mergeMaxCol = -Infinity;
+      earlyMergeList.forEach(rangeStr => {
+        const [a,b] = rangeStr.split(":");
+        const p1 = parseAddr(a), p2 = parseAddr(b);
+        mergeMinRow = Math.min(mergeMinRow, p1.row); mergeMaxRow = Math.max(mergeMaxRow, p2.row);
+        mergeMinCol = Math.min(mergeMinCol, p1.col); mergeMaxCol = Math.max(mergeMaxCol, p2.col);
+      });
+      const probeMaxRow = Math.min(Math.max(dim.bottom || 0, isFinite(mergeMaxRow) ? mergeMaxRow : 0, ws.rowCount || 0, 1), 500);
+      const probeMaxCol = Math.min(Math.max(dim.right || 0, isFinite(mergeMaxCol) ? mergeMaxCol : 0, ws.columnCount || 0, 1), 100);
+      let minRow = Infinity, maxRow = -Infinity, minCol = Infinity, maxCol = -Infinity;
+      for (let r=1; r<=probeMaxRow; r++){
+        for (let c=1; c<=probeMaxCol; c++){
+          const cell = ws.getCell(r, c);
+          const hasFill = cell.fill && cell.fill.type === "pattern" && cell.fill.pattern && cell.fill.pattern !== "none";
+          const bd = cell.border;
+          // 色や文字が無くても、罫線だけで枠を描いて意図的に配置されたセル（空欄マス）もテンプレートの一部として扱う
+          const hasBorder = !!(bd && (bd.top || bd.bottom || bd.left || bd.right));
+          if (hasFill || hasBorder || cellText(cell).trim()){
+            if (r < minRow) minRow = r;
+            if (r > maxRow) maxRow = r;
+            if (c < minCol) minCol = c;
+            if (c > maxCol) maxCol = c;
+          }
+        }
+      }
+      if (!isFinite(minRow)){
+        // 塗りつぶしも文字も無ければ元のdimensionsにフォールバック
+        minRow = dim.top; maxRow = dim.bottom; minCol = dim.left; maxCol = dim.right;
+      } else if (isFinite(mergeMinRow)){
+        // 罫線だけの結合セル（後で文字を入れるラベル欄など）も範囲に含める
+        minRow = Math.min(minRow, mergeMinRow); maxRow = Math.max(maxRow, mergeMaxRow);
+        minCol = Math.min(minCol, mergeMinCol); maxCol = Math.max(maxCol, mergeMaxCol);
+      }
+      const rows = maxRow - minRow + 1;
+      const cols = maxCol - minCol + 1;
+
+      if (rows > 60 || cols > 40){
+        showToast("シートの行数・列数が非常に多いため、読み込みに時間がかかるか正しく表示されない可能性があります。", "info");
+      }
+
+      const colWidths = [];
+      for (let c=minCol; c<=maxCol; c++){
+        const w = ws.getColumn(c).width || 8.43;
+        colWidths.push(Math.max(30, Math.round(w*7+5)));
+      }
+      const rowHeights = [];
+      for (let r=minRow; r<=maxRow; r++){
+        const h = ws.getRow(r).height || 15;
+        rowHeights.push(Math.max(24, Math.round(h*96/72)));
+      }
+
+      const covered = [];
+      const spans = {};
+      const mergeList = earlyMergeList;
+      mergeList.forEach(rangeStr => {
+        const [a,b] = rangeStr.split(":");
+        const p1 = parseAddr(a), p2 = parseAddr(b);
+        const r0 = p1.row - minRow, c0 = p1.col - minCol;
+        const r1 = p2.row - minRow, c1 = p2.col - minCol;
+        spans[cellKey(r0,c0)] = { rowspan: (r1-r0+1), colspan: (c1-c0+1) };
+        for (let r=r0; r<=r1; r++){
+          for (let c=c0; c<=c1; c++){
+            if (r===r0 && c===c0) continue;
+            covered.push(cellKey(r,c));
+          }
+        }
+      });
+
+      const roles = {};
+      const cells = {};
+      let imageCellCount = 0;
+      for (let r=minRow; r<=maxRow; r++){
+        for (let c=minCol; c<=maxCol; c++){
+          const key = cellKey(r-minRow, c-minCol);
+          if (covered.indexOf(key) !== -1) continue;
+          const cell = ws.getCell(r,c);
+          const txt = cellText(cell).trim();
+          const yellow = isYellowFill(cell);
+          if (yellow){
+            roles[key] = "image";
+            imageCellCount++;
+          } else if (txt === "" || txt === "空欄"){
+            roles[key] = "blank";
+          } else if (txt.indexOf("文字") !== -1 || txt.indexOf("テキスト") !== -1){
+            roles[key] = "text";
+          } else {
+            roles[key] = "text";
+            cells[key] = { type: "text", text: txt };
+          }
+        }
+      }
+
+      const id = "tpl_" + Date.now();
+      let name = file.name.replace(/\.(xlsx|xlsm)$/i, "");
+      state.templates[id] = {
+        name, type: "imported", rows, cols, colWidths, rowHeights,
+        roles, covered, spans, cells
+      };
+      state.activeTemplateId = id;
+      scheduleSave();
+      renderTemplateSelect();
+      renderAll();
+      if (imageCellCount === 0){
+        showToast("画像セル（黄色に塗られたセル）が見つかりませんでした。文字セルのみのテンプレートとして読み込みました。", "info");
+      } else {
+        showToast(`テンプレート「${name}」を読み込みました（画像セル${imageCellCount}個）。`);
+      }
+    } catch(err){
+      console.error(err);
+      showToast("Excelの内容を解析できませんでした。セルの結合や色設定を見直してください。", "error");
+    } finally {
+      hideLoading();
+    }
+  }
+
+  function checkOverflow(){
+    const banner = document.getElementById("overflowWarning");
+    const scale = computeFitScale(activeTpl());
+    if (scale < 0.98){
+      const pct = Math.round(scale * 100);
+      banner.className = "warning-banner";
+      banner.style.display = "block";
+      banner.textContent = `ℹ 内容量に合わせて、印刷時に${pct}%に自動縮小して1ページに収めます。文字や画像が小さくなりすぎる場合は、行数を減らす・セルサイズを小さくする・印刷の向きを変える、のいずれかをお試しください。`;
+    } else {
+      banner.style.display = "none";
+    }
+  }
+
+  function updateOrientation(){
+    const o = state.printOrientation || "landscape";
+    document.getElementById("pageSizeStyle").textContent = `@page { size: A4 ${o}; margin: 12mm; }`;
+    document.getElementById("orientationSelect").value = o;
+    checkOverflow();
+  }
+  document.getElementById("orientationSelect").addEventListener("change", (e) => {
+    state.printOrientation = e.target.value;
+    scheduleSave();
+    updateOrientation();
+    renderPrintArea();
+  });
+
+  document.getElementById("fitSelect").addEventListener("change", (e) => {
+    state.imageFit = e.target.value;
+    scheduleSave();
+    renderAll();
+  });
+
+  document.getElementById("fontSizeRange").addEventListener("input", (e) => {
+    state.textFontSize = Number(e.target.value);
+    document.getElementById("fontSizeValue").textContent = state.textFontSize + "px";
+    scheduleSave();
+    renderAll();
+  });
+
+  document.getElementById("xlsxInput").addEventListener("change", (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) importExcelTemplate(file);
+    e.target.value = "";
+  });
+
+  // ---------- simple template toolbar ----------
+  document.getElementById("rowPlus").addEventListener("click", () => {
+    const t=activeTpl();
+    if (t.rows<12){ t.rows++; t.rowHeights.push(t.rowHeights[t.rowHeights.length-1] || 100); scheduleSave(); renderAll(); syncCounts(); }
+  });
+  document.getElementById("rowMinus").addEventListener("click", () => {
+    const t=activeTpl();
+    if (t.rows>1){ t.rows--; t.rowHeights.pop(); scheduleSave(); renderAll(); syncCounts(); }
+  });
+  document.getElementById("colPlus").addEventListener("click", () => {
+    const t=activeTpl();
+    if (t.cols<8){ t.cols++; t.colWidths.push(t.colWidths[t.colWidths.length-1] || 130); scheduleSave(); renderAll(); syncCounts(); }
+  });
+  document.getElementById("colMinus").addEventListener("click", () => {
+    const t=activeTpl();
+    if (t.cols>1){ t.cols--; t.colWidths.pop(); scheduleSave(); renderAll(); syncCounts(); }
+  });
+  function syncCounts(){
+    const t = activeTpl();
+    document.getElementById("rowCount").textContent = t.rows;
+    document.getElementById("colCount").textContent = t.cols;
+    renderSizeInputs();
+  }
+  // 列ごとの幅・行ごとの高さを数値で指定できるようにする入力欄を組み立てる
+  function renderSizeInputs(){
+    const tpl = activeTpl();
+    if (tpl.type !== "simple") return;
+    const colList = document.getElementById("colWidthList");
+    const rowList = document.getElementById("rowHeightList");
+    colList.innerHTML = "";
+    tpl.colWidths.forEach((w, idx) => {
+      const wrap = document.createElement("div");
+      wrap.className = "size-num-wrap";
+      wrap.innerHTML = `<span class="size-num-label">列${idx+1}</span><input type="number" min="30" max="1000" value="${w}">`;
+      wrap.querySelector("input").addEventListener("input", (e) => {
+        const v = Math.max(30, Math.min(1000, Number(e.target.value) || 30));
+        activeTpl().colWidths[idx] = v;
+        scheduleSave();
+        renderAll();
+      });
+      colList.appendChild(wrap);
+    });
+    rowList.innerHTML = "";
+    tpl.rowHeights.forEach((h, idx) => {
+      const wrap = document.createElement("div");
+      wrap.className = "size-num-wrap";
+      wrap.innerHTML = `<span class="size-num-label">行${idx+1}</span><input type="number" min="24" max="300" value="${h}">`;
+      wrap.querySelector("input").addEventListener("input", (e) => {
+        const v = Math.max(24, Math.min(300, Number(e.target.value) || 24));
+        activeTpl().rowHeights[idx] = v;
+        scheduleSave();
+        renderAll();
+      });
+      rowList.appendChild(wrap);
+    });
+  }
+
+  document.getElementById("fileInput").addEventListener("change", (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (!files.length) return;
+    addUploadedFiles(files);
+  });
+
+  // ---------- ファイルへの保存／読み込み ----------
+  function sanitizeFilename(name){
+    const cleaned = String(name || "").replace(/[\\/:*?"<>|]/g, "_").trim();
+    return cleaned || "みとおしボード";
+  }
+  function blobToDataUrl(blob){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error("画像の変換に失敗しました。"));
+      reader.readAsDataURL(blob);
+    });
+  }
+  async function buildExportData(){
+    const tplClone = JSON.parse(JSON.stringify(activeTpl()));
+    const usedImageIds = new Set();
+    Object.values(tplClone.cells || {}).forEach(cell => {
+      if (cell && cell.type === "image" && cell.imageId) usedImageIds.add(cell.imageId);
+    });
+    const images = {};
+    for (const id of usedImageIds){
+      const entry = imageIndex.get(id);
+      if (!entry || entry.isPreset) continue; // プリセット画像はアプリ標準搭載のため埋め込み不要
+      const record = await idbGetImage(id);
+      if (!record) continue;
+      const dataUrl = await blobToDataUrl(record.blob);
+      images[id] = { name: record.name, mime: record.mime, w: record.w, h: record.h, dataUrl };
+    }
+    return {
+      formatVersion: 1,
+      savedAt: new Date().toISOString(),
+      template: tplClone,
+      imageFit: state.imageFit,
+      textFontSize: state.textFontSize,
+      printOrientation: state.printOrientation,
+      images
+    };
+  }
+  async function saveBoardToFile(){
+    const suggestedName = sanitizeFilename(activeTpl().name) + ".json";
+    let handle = null;
+    if (window.showSaveFilePicker){
+      try {
+        handle = await window.showSaveFilePicker({
+          suggestedName,
+          types: [{ description: "みとおしボード ファイル", accept: { "application/json": [".json"] } }]
+        });
+      } catch(err){
+        if (err && err.name === "AbortError") return;
+        console.error(err);
+        showToast("保存場所の選択でエラーが発生しました。", "error");
+        return;
+      }
+    }
+    showLoading("保存しています…");
+    try {
+      const data = await buildExportData();
+      const json = JSON.stringify(data);
+      if (handle){
+        const writable = await handle.createWritable();
+        await writable.write(json);
+        await writable.close();
+      } else {
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = suggestedName;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+      showToast(`「${suggestedName}」として保存しました。`);
+    } catch(err){
+      console.error(err);
+      showToast("保存に失敗しました：" + (err.message || "不明なエラー"), "error");
+    } finally {
+      hideLoading();
+    }
+  }
+
+  function pickFileFallback(){
+    return new Promise(resolve => {
+      const input = document.getElementById("openFileInput");
+      input.value = "";
+      const handler = (e) => {
+        input.removeEventListener("change", handler);
+        resolve(e.target.files && e.target.files[0] ? e.target.files[0] : null);
+      };
+      input.addEventListener("change", handler);
+      input.click();
+    });
+  }
+  async function loadBoardFromFile(file){
+    showLoading("読み込んでいます…");
+    try {
+      const text = await file.text();
+      let data;
+      try { data = JSON.parse(text); } catch(e){ throw new Error("ファイルの形式が正しくありません。"); }
+      if (!data || typeof data !== "object" || !data.template || typeof data.template !== "object"){
+        throw new Error("みとおしボードのファイルではないようです。");
+      }
+      const tpl = JSON.parse(JSON.stringify(data.template));
+      if (!tpl.cells) tpl.cells = {};
+      const idMap = {};
+      const importedImages = data.images || {};
+      for (const oldId of Object.keys(importedImages)){
+        const info = importedImages[oldId] || {};
+        try {
+          const resp = await fetch(info.dataUrl);
+          const blob = await resp.blob();
+          uploadCounter++;
+          const newId = "up_" + Date.now() + "_" + uploadCounter;
+          const name = info.name || "画像";
+          await idbPutImage({ id: newId, name, blob, mime: info.mime || blob.type, w: info.w || 0, h: info.h || 0, createdAt: Date.now() });
+          const objectUrl = URL.createObjectURL(blob);
+          imageIndex.set(newId, { id: newId, name, isPreset: false, objectUrl });
+          state.imageOrder.push(newId);
+          idMap[oldId] = newId;
+        } catch(err){
+          console.error(err);
+          showToast(`画像「${info.name || oldId}」の読み込みに失敗しました。`, "error");
+        }
+      }
+      Object.keys(tpl.cells).forEach(key => {
+        const cell = tpl.cells[key];
+        if (cell && cell.type === "image" && cell.imageId && idMap[cell.imageId]){
+          cell.imageId = idMap[cell.imageId];
+        }
+      });
+      const newTplId = "tpl_" + Date.now();
+      tpl.name = tpl.name || file.name.replace(/\.json$/i, "") || "読み込んだボード";
+      if (!tpl.type) tpl.type = "simple";
+      state.templates[newTplId] = tpl;
+      state.activeTemplateId = newTplId;
+      if (data.imageFit) state.imageFit = data.imageFit;
+      if (data.textFontSize) state.textFontSize = data.textFontSize;
+      if (data.printOrientation) state.printOrientation = data.printOrientation;
+      scheduleSave();
+      document.getElementById("fitSelect").value = state.imageFit || "cover";
+      document.getElementById("fontSizeRange").value = state.textFontSize || 13;
+      document.getElementById("fontSizeValue").textContent = (state.textFontSize || 13) + "px";
+      renderTemplateSelect();
+      renderSidebar();
+      renderAll();
+      updateOrientation();
+      updateStorageMeter();
+      showToast(`「${tpl.name}」を開きました。`);
+    } catch(err){
+      console.error(err);
+      showToast("ファイルを開けませんでした：" + (err.message || "不明なエラー"), "error");
+    } finally {
+      hideLoading();
+    }
+  }
+  async function openBoardFromFile(){
+    let file = null;
+    if (window.showOpenFilePicker){
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          types: [{ description: "みとおしボード ファイル", accept: { "application/json": [".json"] } }],
+          multiple: false
+        });
+        file = await handle.getFile();
+      } catch(err){
+        if (err && err.name === "AbortError") return;
+        console.error(err);
+        showToast("ファイルの選択でエラーが発生しました。", "error");
+        return;
+      }
+    } else {
+      file = await pickFileFallback();
+      if (!file) return;
+    }
+    await loadBoardFromFile(file);
+  }
+  document.getElementById("btnSave").addEventListener("click", saveBoardToFile);
+  document.getElementById("btnOpen").addEventListener("click", openBoardFromFile);
+
+  function togglePreview(){
+    document.body.classList.toggle("previewing");
+    const isPreview = document.body.classList.contains("previewing");
+    document.getElementById("btnPreview").textContent = isPreview ? "編集に戻る" : "プレビュー";
+    if (isPreview) renderPrintArea();
+  }
+  function printBoard(){
+    renderPrintArea();
+    checkOverflow();
+    setTimeout(() => window.print(), 50);
+  }
+
+  document.getElementById("btnPreview").addEventListener("click", togglePreview);
+  document.getElementById("btnPreviewBack").addEventListener("click", () => {
+    togglePreview();
+    renderPrintArea();
+  });
+  document.getElementById("btnPrint").addEventListener("click", printBoard);
+  document.getElementById("btnPrintFloating").addEventListener("click", printBoard);
+
+  document.getElementById("btnReset").addEventListener("click", async () => {
+    if (!confirm("入力内容・取り込んだテンプレート・保存した画像をすべて消去して初期状態に戻します。よろしいですか？この操作は取り消せません。")) return;
+    try {
+      imageIndex.forEach(entry => { if (!entry.isPreset && entry.objectUrl) URL.revokeObjectURL(entry.objectUrl); });
+      await idbClearAll();
+    } catch(err){
+      console.error(err);
+      showToast("初期化中にエラーが発生しました。", "error");
+    }
+    state = defaultState();
+    selectedImageId = null;
+    await init();
+  });
+
+  async function init(){
+    document.getElementById("fitSelect").value = state.imageFit || "cover";
+    document.getElementById("fontSizeRange").value = state.textFontSize || 13;
+    document.getElementById("fontSizeValue").textContent = (state.textFontSize || 13) + "px";
+    syncCounts();
+    renderTemplateSelect();
+    renderSidebar();
+    renderAll();
+    updateOrientation();
+    updateStorageMeter();
+  }
+
+  (async function start(){
+    showLoading("データを読み込んでいます…");
+    try {
+      await loadState();
+      await loadImageIndex();
+    } catch(err){
+      console.error(err);
+      showToast("初期化中にエラーが発生しました。ページを再読み込みしてください。", "error");
+    } finally {
+      hideLoading();
+    }
+    await init();
+  })();
+
+})();
+</script>
+</body>
+</html>
