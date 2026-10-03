@@ -442,7 +442,7 @@
 
 <main id="app">
   <aside id="sidebar">
-    <h2>画像一覧</h2>
+    <h2>画像一覧<button type="button" class="help-btn" id="helpImagesBtn" title="説明を見る">？</button></h2>
     <p class="hint">画像をクリックして選ぶと、下に選択中の画像が表示されます。そのまま配置したいセルをクリックしてください（ドラッグ＆ドロップも使えます）。</p>
     <label class="upload-btn">
       ＋ 画像を追加
@@ -1565,6 +1565,9 @@
         showToast(`「${sharedEntry.name}」を共有フォーマット集からも削除しました。`, "success");
       }
     }
+  });
+  document.getElementById("helpImagesBtn").addEventListener("click", () => {
+    alert("【画像一覧とは】\n\n絵カードの画像を集めた一覧です。全教室で共有されます。\n\n・「＋画像を追加」で新しい画像を登録できます（全教室で使えるようになります）\n・画像をクリックして選び、配置したいマスをクリックすると、そのマスに画像が入ります（ドラッグ＆ドロップでも配置できます）\n・「選択して削除・分類」で、複数の画像をまとめて削除したり、カテゴリに分けたりできます\n・画像一覧から削除しても、すでにマスに配置済みの画像はそのまま残ります");
   });
   document.getElementById("helpTplBtn").addEventListener("click", () => {
     alert("【テンプレートとは】\n\nこの教室だけで使う、スケジュール表の台紙（レイアウト）です。\n\n・行や列、セルの中身を自由に編集できます\n・保存すると、この教室のデータとして残ります\n・複数のテンプレートを作って切り替えられます（例：平日用／土曜用）\n・他の教室のテンプレートには影響しません");
