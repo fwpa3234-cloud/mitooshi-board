@@ -12,7 +12,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <style id="pageSizeStyle">
-  @page { size: A4 landscape; margin: 12mm; }
+  @page { size: A4 landscape; margin: 0; }
 </style>
 <style>
   :root {
@@ -1486,7 +1486,7 @@
     const o = state.printOrientation || "landscape";
     const pageWmm = o === "landscape" ? 297 : 210;
     const pageHmm = o === "landscape" ? 210 : 297;
-    const marginMm = 12;
+    const marginMm = 0;
     return { contentWmm: pageWmm - marginMm*2, contentHmm: pageHmm - marginMm*2 };
   }
 
@@ -1835,7 +1835,7 @@
 
   function updateOrientation(){
     const o = state.printOrientation || "landscape";
-    document.getElementById("pageSizeStyle").textContent = `@page { size: A4 ${o}; margin: 12mm; }`;
+    document.getElementById("pageSizeStyle").textContent = `@page { size: A4 ${o}; margin: 0; }`;
     document.getElementById("orientationSelect").value = o;
     checkOverflow();
   }
