@@ -1540,6 +1540,7 @@
     const ids = Object.keys(state.templates);
     if (ids.length <= 1){ showToast("最後の1つのテンプレートは削除できません。", "error"); return; }
     if (!confirm("このテンプレートを削除します。よろしいですか？")) return;
+    const deletedTpl = state.templates[state.activeTemplateId];
     delete state.templates[state.activeTemplateId];
     const remaining = Object.keys(state.templates);
     state.activeTemplateId = remaining.includes("simple") ? "simple" : remaining[0];
@@ -1547,6 +1548,16 @@
     renderTemplateSelect();
     syncCounts();
     renderAll();
+    const sharedId = deletedTpl && deletedTpl.sharedId;
+    const sharedEntry = sharedId && library.templates && library.templates[sharedId];
+    if (sharedEntry){
+      if (confirm(`共有フォーマット集に登録されている「${sharedEntry.name}」も、全教室から呼び出せなくなるよう削除しますか？`)){
+        delete library.templates[sharedId];
+        scheduleSaveLibrary();
+        renderSharedTemplateSelect();
+        showToast(`「${sharedEntry.name}」を共有フォーマット集からも削除しました。`, "success");
+      }
+    }
   });
   document.getElementById("btnSaveAsTpl").addEventListener("click", () => {
     const tpl = activeTpl();
@@ -1596,6 +1607,8 @@
     if (!library.templates) library.templates = {};
     const id = "shared_" + Date.now();
     library.templates[id] = clone;
+    tpl.sharedId = id;
+    scheduleSave();
     scheduleSaveLibrary();
     renderSharedTemplateSelect();
     showToast(`「${clone.name}」を共有フォーマット集に登録しました。`, "success");
@@ -1636,6 +1649,7 @@
     const shared = library.templates && library.templates[id];
     if (!shared){ showToast("呼び出す共有フォーマットを選択してください。", "error"); return; }
     const clone = JSON.parse(JSON.stringify(shared));
+    clone.sharedId = id;
     const newId = "tpl_" + Date.now();
     state.templates[newId] = clone;
     state.activeTemplateId = newId;
