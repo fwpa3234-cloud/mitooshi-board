@@ -1564,8 +1564,23 @@
     const defaultName = (tpl.name || "テンプレート") + "のコピー";
     const name = prompt("新しいテンプレート名を入力してください（例：平日フォーマット／土曜フォーマット）", defaultName);
     if (!name || !name.trim()) return;
+    const trimmedName = name.trim();
+    const dupId = Object.keys(state.templates).find(tid => tid !== state.activeTemplateId && state.templates[tid].name === trimmedName);
+    if (dupId){
+      if (!confirm(`「${trimmedName}」という名前のテンプレートがすでにあります。上書きしますか？（いいえを選ぶと保存を中止します）`)) return;
+      const overwrite = JSON.parse(JSON.stringify(tpl));
+      overwrite.name = trimmedName;
+      state.templates[dupId] = overwrite;
+      state.activeTemplateId = dupId;
+      scheduleSave();
+      renderTemplateSelect();
+      syncCounts();
+      renderAll();
+      showToast(`テンプレート「${trimmedName}」を上書きしました。`, "success");
+      return;
+    }
     const clone = JSON.parse(JSON.stringify(tpl));
-    clone.name = name.trim();
+    clone.name = trimmedName;
     const newId = "tpl_" + Date.now();
     state.templates[newId] = clone;
     state.activeTemplateId = newId;
@@ -1648,6 +1663,16 @@
     const id = sel.value;
     const shared = library.templates && library.templates[id];
     if (!shared){ showToast("呼び出す共有フォーマットを選択してください。", "error"); return; }
+    const existingId = Object.keys(state.templates).find(tid => state.templates[tid].sharedId === id);
+    if (existingId){
+      state.activeTemplateId = existingId;
+      scheduleSave();
+      renderTemplateSelect();
+      syncCounts();
+      renderAll();
+      showToast(`すでに取り込み済みの「${state.templates[existingId].name}」に切り替えました。`, "success");
+      return;
+    }
     const clone = JSON.parse(JSON.stringify(shared));
     clone.sharedId = id;
     const newId = "tpl_" + Date.now();
