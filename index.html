@@ -1903,9 +1903,9 @@
     tpl.colWidths.forEach((w, idx) => {
       const wrap = document.createElement("div");
       wrap.className = "size-num-wrap";
-      wrap.innerHTML = `<span class="size-num-label">列${idx+1}</span><input type="number" step="0.1" min="0.8" max="26.5" value="${pxToCm(w)}">`;
+      wrap.innerHTML = `<span class="size-num-label">列${idx+1}</span><input type="number" step="0.1" min="0.8" max="30" value="${pxToCm(w)}">`;
       wrap.querySelector("input").addEventListener("input", (e) => {
-        const cmVal = Math.max(0.8, Math.min(26.5, Number(e.target.value) || 0.8));
+        const cmVal = Math.max(0.8, Math.min(30, Number(e.target.value) || 0.8));
         activeTpl().colWidths[idx] = cmToPx(cmVal);
         scheduleSave();
         renderAll();
@@ -1916,9 +1916,9 @@
     tpl.rowHeights.forEach((h, idx) => {
       const wrap = document.createElement("div");
       wrap.className = "size-num-wrap";
-      wrap.innerHTML = `<span class="size-num-label">行${idx+1}</span><input type="number" step="0.1" min="0.6" max="8" value="${pxToCm(h)}">`;
+      wrap.innerHTML = `<span class="size-num-label">行${idx+1}</span><input type="number" step="0.1" min="0.6" max="21" value="${pxToCm(h)}">`;
       wrap.querySelector("input").addEventListener("input", (e) => {
-        const cmVal = Math.max(0.6, Math.min(8, Number(e.target.value) || 0.6));
+        const cmVal = Math.max(0.6, Math.min(21, Number(e.target.value) || 0.6));
         activeTpl().rowHeights[idx] = cmToPx(cmVal);
         scheduleSave();
         renderAll();
