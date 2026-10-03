@@ -474,6 +474,7 @@
         <select id="sharedTemplateSelect"><option value="">（選択してください）</option></select>
         <button class="small" id="btnLoadSharedTpl" title="選んだ共有フォーマットを、この教室に読み込みます">呼び出す</button>
         <button class="small" id="btnRenameSharedTpl" title="選んだ共有フォーマットの名前を修正します">名前を修正</button>
+        <button class="small danger" id="btnDeleteSharedTpl" title="選んだ共有フォーマットを削除します">削除</button>
         <button class="small" id="btnPublishSharedTpl" title="今のフォーマットを、全教室が使える共有フォーマット集に登録します">＋ 共有に登録</button>
       </div>
       <div class="group">
@@ -1615,6 +1616,18 @@
     scheduleSaveLibrary();
     renderSharedTemplateSelect();
     showToast(`名前を「${trimmed}」に修正しました。`, "success");
+  });
+
+  document.getElementById("btnDeleteSharedTpl").addEventListener("click", () => {
+    const sel = document.getElementById("sharedTemplateSelect");
+    const id = sel.value;
+    const shared = library.templates && library.templates[id];
+    if (!shared){ showToast("削除する共有フォーマットを選択してください。", "error"); return; }
+    if (!confirm(`共有フォーマット「${shared.name}」を削除します。全教室から呼び出せなくなります。よろしいですか？`)) return;
+    delete library.templates[id];
+    scheduleSaveLibrary();
+    renderSharedTemplateSelect();
+    showToast(`「${shared.name}」を共有フォーマット集から削除しました。`, "success");
   });
 
   document.getElementById("btnLoadSharedTpl").addEventListener("click", () => {
