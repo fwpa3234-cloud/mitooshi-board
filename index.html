@@ -504,7 +504,7 @@
         <div class="size-input-list" id="colWidthList"></div>
       </div>
       <div class="group size-inputs">
-        <label>行高(px)</label>
+        <label>行高(cm)</label>
         <div class="size-input-list" id="rowHeightList"></div>
       </div>
     </div>
@@ -1905,16 +1905,21 @@
     tpl.rowHeights.forEach((h, idx) => {
       const wrap = document.createElement("div");
       wrap.className = "size-num-wrap";
-      wrap.innerHTML = `<span class="size-num-label">行${idx+1}</span><input type="number" min="24" max="300" value="${h}">`;
+      wrap.innerHTML = `<span class="size-num-label">行${idx+1}</span><input type="number" step="0.1" min="0.6" max="8" value="${pxToCm(h)}">`;
       wrap.querySelector("input").addEventListener("input", (e) => {
-        const v = Math.max(24, Math.min(300, Number(e.target.value) || 24));
-        activeTpl().rowHeights[idx] = v;
+        const cmVal = Math.max(0.6, Math.min(8, Number(e.target.value) || 0.6));
+        activeTpl().rowHeights[idx] = cmToPx(cmVal);
         scheduleSave();
         renderAll();
       });
       rowList.appendChild(wrap);
     });
   }
+
+  // pxとcmの相互変換（ディスプレイ解像度96dpiを基準。行の高さの入力欄で使用）
+  const PX_PER_CM = 96 / 2.54;
+  function pxToCm(px){ return Math.round((px / PX_PER_CM) * 10) / 10; }
+  function cmToPx(cm){ return Math.round(cm * PX_PER_CM); }
 
   document.getElementById("fileInput").addEventListener("change", (e) => {
     const files = Array.from(e.target.files || []);
