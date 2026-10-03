@@ -193,7 +193,8 @@
     border: 1px solid var(--line); background: var(--surface); color: var(--text);
   }
 
-  .grid-wrap { overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 20px; box-shadow: var(--shadow); }
+  .grid-wrap { overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 20px; box-shadow: var(--shadow); zoom: var(--board-zoom, 1); }
+  .grid-frame { width: 30cm; height: 21cm; margin: 0 auto; background: var(--surface); box-shadow: 0 0 0 1px var(--line); overflow: auto; }
   .grid { display: grid; gap: 4px; width: max-content; }
   .cell {
     background: var(--surface-2); border: 1.5px dashed var(--line); border-radius: 6px;
@@ -507,10 +508,20 @@
         <label>行高(cm)</label>
         <div class="size-input-list" id="rowHeightList"></div>
       </div>
+      <div class="group">
+        <label>表示ズーム</label>
+        <select id="zoomSelect">
+          <option value="125">125%</option>
+          <option value="100" selected>100%</option>
+          <option value="75">75%</option>
+          <option value="50">50%</option>
+          <option value="25">25%</option>
+        </select>
+      </div>
     </div>
 
     <div class="warning-banner" id="overflowWarning"></div>
-    <div class="grid-wrap"><div class="grid" id="editGrid"></div></div>
+    <div class="grid-wrap" id="gridWrap"><div class="grid-frame" id="gridFrame"><div class="grid" id="editGrid"></div></div></div>
 
     <p class="note" id="ruleNote">
       画像とスケジュール表のデータは、合言葉を知っている全教室で共有されるクラウド（Firebase）に保存されます。個人を特定できる写真や、お子さまの実名が分かる画像のアップロードは避け、イラスト等の絵カードのみをご利用ください。空欄の文字セルはクリックするとその場で文字入力できます。大きな画像は保存時に自動で縮小されます。
@@ -1920,6 +1931,27 @@
   const PX_PER_CM = 96 / 2.54;
   function pxToCm(px){ return Math.round((px / PX_PER_CM) * 10) / 10; }
   function cmToPx(cm){ return Math.round(cm * PX_PER_CM); }
+
+  // ---------- 表示ズーム（この端末だけの表示設定。保存データ・印刷には影響しません） ----------
+  const ZOOM_STORAGE_KEY = "mitooshi_zoom";
+  function applyZoom(pct){
+    const wrap = document.getElementById("gridWrap");
+    if (wrap) wrap.style.setProperty("--board-zoom", String(pct / 100));
+  }
+  (function initZoom(){
+    let saved = 100;
+    try { saved = Number(localStorage.getItem(ZOOM_STORAGE_KEY)) || 100; } catch(e){}
+    const sel = document.getElementById("zoomSelect");
+    if (sel){
+      sel.value = String(saved);
+      sel.addEventListener("change", (e) => {
+        const pct = Number(e.target.value) || 100;
+        applyZoom(pct);
+        try { localStorage.setItem(ZOOM_STORAGE_KEY, String(pct)); } catch(e){}
+      });
+    }
+    applyZoom(saved);
+  })();
 
   document.getElementById("fileInput").addEventListener("change", (e) => {
     const files = Array.from(e.target.files || []);
