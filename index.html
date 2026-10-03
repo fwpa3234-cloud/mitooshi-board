@@ -500,7 +500,7 @@
         <button class="small" id="colMinus">－</button><span id="colCount">4</span><button class="small" id="colPlus">＋</button>
       </div>
       <div class="group size-inputs">
-        <label>列幅(px)</label>
+        <label>列幅(cm)</label>
         <div class="size-input-list" id="colWidthList"></div>
       </div>
       <div class="group size-inputs">
@@ -1892,10 +1892,10 @@
     tpl.colWidths.forEach((w, idx) => {
       const wrap = document.createElement("div");
       wrap.className = "size-num-wrap";
-      wrap.innerHTML = `<span class="size-num-label">列${idx+1}</span><input type="number" min="30" max="1000" value="${w}">`;
+      wrap.innerHTML = `<span class="size-num-label">列${idx+1}</span><input type="number" step="0.1" min="0.8" max="26.5" value="${pxToCm(w)}">`;
       wrap.querySelector("input").addEventListener("input", (e) => {
-        const v = Math.max(30, Math.min(1000, Number(e.target.value) || 30));
-        activeTpl().colWidths[idx] = v;
+        const cmVal = Math.max(0.8, Math.min(26.5, Number(e.target.value) || 0.8));
+        activeTpl().colWidths[idx] = cmToPx(cmVal);
         scheduleSave();
         renderAll();
       });
