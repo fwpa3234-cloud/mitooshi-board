@@ -481,7 +481,7 @@
         <select id="sharedTemplateSelect"><option value="">（選択してください）</option></select>
         <button class="small" id="btnLoadSharedTpl" title="選んだ共有フォーマットを、この教室に読み込みます">呼び出す</button>
         <button class="small" id="btnRenameSharedTpl" title="選んだ共有フォーマットの名前を修正します">名前を修正</button>
-        <button class="small danger" id="btnDeleteSharedTpl" title="選んだ共有フォーマットを削除します">削除</button>
+        <button class="small danger" id="btnDeleteSharedTpl" title="選んだ共有フォーマットを削除します">削除</button><button type="button" class="help-btn" id="helpDeleteSharedBtn" title="説明を見る">？</button>
         <button class="small" id="btnPublishSharedTpl" title="今のフォーマットを、全教室が使える共有フォーマット集に登録します">＋ 共有に登録</button>
       </div>
       <div class="group">
@@ -504,7 +504,7 @@
       </div>
       <div class="group" id="importedActions" style="display:none;">
         <button class="small" id="btnRenameTpl">名前を変更</button>
-        <button class="small danger" id="btnDeleteTpl">このテンプレートを削除</button>
+        <button class="small danger" id="btnDeleteTpl">このテンプレートを削除</button><button type="button" class="help-btn" id="helpDeleteTplBtn" title="説明を見る">？</button>
       </div>
       <div class="group" id="tplMetaGroup"><span class="tpl-meta" id="tplMeta"></span></div>
       <div class="group"><span class="tpl-meta" id="lastUpdatedInfo"></span></div>
@@ -1571,6 +1571,12 @@
   });
   document.getElementById("helpSharedBtn").addEventListener("click", () => {
     alert("【共有フォーマット集とは】\n\n全教室で使い回せるように登録した、テンプレートのコピーです。\n\n・「＋共有に登録」を押すと、今のテンプレートのコピーがここに追加されます\n・他の教室はここから「呼び出す」ことで、自分の教室に取り込んで使えます\n・テンプレート本体を編集しても、登録済みの共有フォーマットには自動反映されません（更新したい場合は再登録してください）\n・「名前を修正」「削除」で、共有フォーマット集の登録そのものを操作できます");
+  });
+  document.getElementById("helpDeleteSharedBtn").addEventListener("click", () => {
+    alert("【共有フォーマット集の「削除」とは】\n\n選んだ共有フォーマットの登録を、全教室から呼び出せないように消します。\n\n・プルダウンで対象を選んでから押してください\n・全教室が対象です。この教室だけでなく、他の教室もその共有フォーマットを呼び出せなくなります\n・すでに各教室に「呼び出す」で取り込み済みのテンプレートには影響しません（取り込んだコピーはそのまま残ります）\n・取り消せないので、よく確認してから削除してください");
+  });
+  document.getElementById("helpDeleteTplBtn").addEventListener("click", () => {
+    alert("【「このテンプレートを削除」とは】\n\n今開いている、この教室のテンプレートを削除します。\n\n・この教室だけに影響し、他の教室のテンプレートは消えません\n・最後の1つのテンプレートは削除できません\n・このテンプレートを共有フォーマット集に登録・または呼び出したことがある場合は、削除時に共有フォーマット集側も合わせて削除するか確認が出ます\n・取り消せないので、よく確認してから削除してください");
   });
 
   document.getElementById("btnSaveAsTpl").addEventListener("click", () => {
