@@ -473,6 +473,7 @@
         <label>共有フォーマット集（全教室）</label>
         <select id="sharedTemplateSelect"><option value="">（選択してください）</option></select>
         <button class="small" id="btnLoadSharedTpl" title="選んだ共有フォーマットを、この教室に読み込みます">呼び出す</button>
+        <button class="small" id="btnRenameSharedTpl" title="選んだ共有フォーマットの名前を修正します">名前を修正</button>
         <button class="small" id="btnPublishSharedTpl" title="今のフォーマットを、全教室が使える共有フォーマット集に登録します">＋ 共有に登録</button>
       </div>
       <div class="group">
@@ -1597,6 +1598,23 @@
     scheduleSaveLibrary();
     renderSharedTemplateSelect();
     showToast(`「${clone.name}」を共有フォーマット集に登録しました。`, "success");
+  });
+
+  document.getElementById("btnRenameSharedTpl").addEventListener("click", () => {
+    const sel = document.getElementById("sharedTemplateSelect");
+    const id = sel.value;
+    const shared = library.templates && library.templates[id];
+    if (!shared){ showToast("名前を修正する共有フォーマットを選択してください。", "error"); return; }
+    const newName = prompt("新しい名前を入力してください", shared.name || "");
+    if (newName === null) return;
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    shared.name = trimmed;
+    shared.updatedBy = displayName || "スタッフ";
+    shared.updatedAt = Date.now();
+    scheduleSaveLibrary();
+    renderSharedTemplateSelect();
+    showToast(`名前を「${trimmed}」に修正しました。`, "success");
   });
 
   document.getElementById("btnLoadSharedTpl").addEventListener("click", () => {
