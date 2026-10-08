@@ -737,6 +737,7 @@
   let imagesData = new Map();
 
   let imagesReady = false;
+  let imagesSynced = false; // サーバーから画像一覧を取得し終えたか（端末キャッシュだけの間は、一覧から画像を外さない）
   
   // id -> { id, name, isPreset, objectUrl }  … 画像の表示用インデックス（本体はプリセット定数かimagesDataのdataUrl）
   let imageIndex = new Map();
@@ -955,7 +956,7 @@
       if (!rec.hidden && library.imageOrder.indexOf(id) === -1) library.imageOrder.push(id);
     });
     // 実体が既に無い画像IDはリストから外す
-    library.imageOrder = library.imageOrder.filter(id => imageIndex.has(id));
+    if (imagesSynced) library.imageOrder = library.imageOrder.filter(id => imageIndex.has(id));
   }
 
   // images コレクションから画像の実体データを読み込む（初回のみ）
@@ -982,7 +983,8 @@
         if (change.type === "removed") imagesData.delete(change.doc.id);
         else imagesData.set(change.doc.id, change.doc.data());
       });
-      if (!changed && imagesReady) return;
+      if (!snap.metadata.fromCache) imagesSynced = true;
+      if (!changed && imagesReady && imagesSynced) return;
       rebuildImageIndexFromLibrary();
       renderSidebar();
       const ae = document.activeElement;
@@ -1318,7 +1320,8 @@
             if (src){
               cell.innerHTML = `<img src="${src}" alt="" style="object-fit:${fit}"><button class="clear-btn" title="削除">×</button><button class="fit-btn" title="収め方を切り替え">${fit === "cover" ? "全体表示に" : "トリミングに"}</button>`;
             } else {
-                            cell.innerHTML = `<span class="loading-badge">${imagesReady ? "画像が見つかりません" : "画像を読み込み中…"}</span><button class="clear-btn" title="削除">×</button>`;
+              cell.innerHTML = `<span class="loading-badge">${imagesReady ? "画像が見つかりません" : "画像を読み込み中…"}</span><button class="clear-btn" title="削除">×</button>`;
+            }
           } else if (data && data.type === "text"){
             cell.innerHTML = `<div class="text-content" contenteditable="true" style="font-size:${effectiveFontSize(data)}px">${(data.text||"").replace(/</g,"&lt;")}</div><button class="clear-btn" title="削除">×</button><div class="fontsize-controls"><button class="fs-btn" data-dir="-1" title="文字を小さく">A－</button><button class="fs-btn" data-dir="1" title="文字を大きく">A＋</button></div>`;
           } else if (role === "text"){
