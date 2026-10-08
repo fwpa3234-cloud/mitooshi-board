@@ -617,6 +617,7 @@
   const fsAuth = firebase.auth();
   const fsDb = firebase.firestore();
 
+    fsDb.enablePersistence({ synchronizeTabs: true }).catch(function(err){ console.warn("persistence unavailable", err && err.code); });
   function boardDocRef(classroomId){ return fsDb.collection("boards").doc(classroomId); }
   function libraryDocRef(){ return fsDb.collection("library").doc("main"); }
   function imagesCollRef(){ return fsDb.collection("images"); }
@@ -734,6 +735,9 @@
   let library = defaultLibrary();
   // id -> { name, mime, w, h, dataUrl, hidden, createdAt } … images コレクションから読み込んだ画像の実体データ
   let imagesData = new Map();
+
+  let imagesReady = false;
+  
   // id -> { id, name, isPreset, objectUrl }  … 画像の表示用インデックス（本体はプリセット定数かimagesDataのdataUrl）
   let imageIndex = new Map();
   let selectedImageId = null;
@@ -968,19 +972,27 @@
   }
 
   // 他の端末が画像を追加・削除した時に、リアルタイムで画面へ反映する
-  function subscribeImages(){
+    function subscribeImages(){
     if (unsubImages) { unsubImages(); unsubImages = null; }
     unsubImages = imagesCollRef().onSnapshot(snap => {
       let changed = false;
       snap.docChanges().forEach(change => {
-        if (change.doc.metadata.hasPendingWrites) return; // 自分がこれから書き込む変更は無視
+        if (change.doc.metadata.hasPendingWrites) return;
         changed = true;
         if (change.type === "removed") imagesData.delete(change.doc.id);
         else imagesData.set(change.doc.id, change.doc.data());
       });
-      if (!changed) return;
+      if (!changed && imagesReady) return;
       rebuildImageIndexFromLibrary();
       renderSidebar();
+      const ae = document.activeElement;
+      const editing = ae && ae.classList && ae.classList.contains("text-content");
+      if (!imagesReady && (!snap.metadata.fromCache || snap.size > 0)){
+        imagesReady = true;
+        renderAll();
+      } else if (!editing){
+        renderAll();
+      }
     }, err => { console.error(err); });
   }
 
@@ -1306,8 +1318,7 @@
             if (src){
               cell.innerHTML = `<img src="${src}" alt="" style="object-fit:${fit}"><button class="clear-btn" title="削除">×</button><button class="fit-btn" title="収め方を切り替え">${fit === "cover" ? "全体表示に" : "トリミングに"}</button>`;
             } else {
-              cell.innerHTML = `<span class="loading-badge">画像が見つかりません</span><button class="clear-btn" title="削除">×</button>`;
-            }
+                            cell.innerHTML = `<span class="loading-badge">${imagesReady ? "画像が見つかりません" : "画像を読み込み中…"}</span><button class="clear-btn" title="削除">×</button>`;
           } else if (data && data.type === "text"){
             cell.innerHTML = `<div class="text-content" contenteditable="true" style="font-size:${effectiveFontSize(data)}px">${(data.text||"").replace(/</g,"&lt;")}</div><button class="clear-btn" title="削除">×</button><div class="fontsize-controls"><button class="fs-btn" data-dir="-1" title="文字を小さく">A－</button><button class="fs-btn" data-dir="1" title="文字を大きく">A＋</button></div>`;
           } else if (role === "text"){
@@ -2314,15 +2325,14 @@
   document.getElementById("btnUndo").addEventListener("click", undoBoard);
 
   // ---------- 合言葉ゲート ----------
-  async function startApp(){
+    async function startApp(){
     showLoading("データを読み込んでいます…");
     try {
       ensureDisplayName();
       await ensureSignedIn();
       populateClassroomSelect();
-      await loadLibrary();
-      await loadState();
-      await loadImages();
+      await Promise.all([loadLibrary(), loadState()]);
+      rebuildImageIndexFromLibrary();
       subscribeLibrary();
       subscribeImages();
       subscribeBoard();
