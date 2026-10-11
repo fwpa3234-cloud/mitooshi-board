@@ -1357,11 +1357,11 @@
           });
           cell.addEventListener("click", (e) => {
             if (e.target.closest(".clear-btn")) return;
-            if (e.target.closest(".text-content")) return;
             if (selectedImageId){
               if (imageIndex.has(selectedImageId)) setCellImage(r,c,selectedImageId);
               return;
             }
+            if (e.target.closest(".text-content")) return;
             if (role === "free"){
               if (!data){
                 setCellText(r,c,"");
